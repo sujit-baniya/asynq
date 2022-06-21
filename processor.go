@@ -16,12 +16,12 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/time/rate"
 	"asynq/internal/base"
 	asynqcontext "asynq/internal/context"
 	"asynq/internal/errors"
 	"asynq/internal/log"
 	"asynq/internal/timeutil"
+	"golang.org/x/time/rate"
 )
 
 type processor struct {
@@ -226,10 +226,11 @@ func (p *processor) exec() {
 					msg.Type,
 					msg.Payload,
 					&ResultWriter{
-						id:     msg.ID,
-						qname:  msg.Queue,
-						broker: p.broker,
-						ctx:    ctx,
+						id:        msg.ID,
+						qname:     msg.Queue,
+						nextQueue: msg.NextQueue,
+						broker:    p.broker,
+						ctx:       ctx,
 					},
 				)
 				resCh <- p.perform(ctx, task)

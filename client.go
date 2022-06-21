@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-redis/redis/v8"
-	"github.com/google/uuid"
 	"asynq/internal/base"
 	"asynq/internal/errors"
 	"asynq/internal/rdb"
+	"github.com/go-redis/redis/v8"
+	"github.com/google/uuid"
 )
 
 // A Client is responsible for scheduling tasks.
@@ -67,6 +67,7 @@ type Option interface {
 type (
 	retryOption     int
 	queueOption     string
+	nextQueueOption string
 	taskIDOption    string
 	timeoutOption   time.Duration
 	deadlineOption  time.Time
@@ -100,6 +101,15 @@ func Queue(name string) Option {
 func (name queueOption) String() string     { return fmt.Sprintf("Queue(%q)", string(name)) }
 func (name queueOption) Type() OptionType   { return QueueOpt }
 func (name queueOption) Value() interface{} { return string(name) }
+
+// NextQueue returns an option to specify the queue to enqueue the task into.
+func NextQueue(name string) Option {
+	return nextQueueOption(name)
+}
+
+func (name nextQueueOption) String() string     { return string(name) }
+func (name nextQueueOption) Type() OptionType   { return QueueOpt }
+func (name nextQueueOption) Value() interface{} { return string(name) }
 
 // TaskID returns an option to specify the task ID.
 func TaskID(id string) Option {
@@ -219,6 +229,7 @@ var ErrTaskIDConflict = errors.New("task ID conflicts with another task")
 type option struct {
 	retry     int
 	queue     string
+	nextQueue string
 	taskID    string
 	timeout   time.Duration
 	deadline  time.Time
@@ -251,6 +262,12 @@ func composeOptions(opts ...Option) (option, error) {
 				return option{}, err
 			}
 			res.queue = qname
+		case nextQueueOption:
+			qname := string(opt)
+			if err := base.ValidateQueueName(qname); err != nil {
+				return option{}, err
+			}
+			res.nextQueue = qname
 		case taskIDOption:
 			id := string(opt)
 			if isBlank(id) {
@@ -372,6 +389,7 @@ func (c *Client) EnqueueContext(ctx context.Context, task *Task, opts ...Option)
 		Type:      task.Type(),
 		Payload:   task.Payload(),
 		Queue:     opt.queue,
+		NextQueue: opt.nextQueue,
 		Retry:     opt.retry,
 		Deadline:  deadline.Unix(),
 		Timeout:   int64(timeout.Seconds()),

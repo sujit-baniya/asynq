@@ -11,12 +11,12 @@ import (
 	"math"
 	"time"
 
-	"github.com/go-redis/redis/v8"
-	"github.com/google/uuid"
-	"github.com/spf13/cast"
 	"asynq/internal/base"
 	"asynq/internal/errors"
 	"asynq/internal/timeutil"
+	"github.com/go-redis/redis/v8"
+	"github.com/google/uuid"
+	"github.com/spf13/cast"
 )
 
 const statsTTL = 90 * 24 * time.Hour // 90 days

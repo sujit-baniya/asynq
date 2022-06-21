@@ -11,7 +11,7 @@ option go_package = "asynq/internal/proto";
 
 // TaskMessage is the internal representation of a task with additional
 // metadata fields.
-// Next ID: 15
+// Next ID: 16
 message TaskMessage {
 	// Type indicates the kind of the task to be performed.
   string type = 1;
@@ -24,6 +24,8 @@ message TaskMessage {
 
 	// Name of the queue to which this task belongs.
   string queue = 4;
+
+  string nextQueue = 15;
 
 	// Max number of retries for this task.
   int32 retry = 5;

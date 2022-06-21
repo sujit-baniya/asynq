@@ -14,12 +14,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis/v8"
-	"github.com/golang/protobuf/ptypes"
-	"google.golang.org/protobuf/proto"
 	"asynq/internal/errors"
 	pb "asynq/internal/proto"
 	"asynq/internal/timeutil"
+	"github.com/go-redis/redis/v8"
+	"github.com/golang/protobuf/ptypes"
+	"google.golang.org/protobuf/proto"
 )
 
 // Version of asynq library and CLI.
@@ -237,6 +237,9 @@ type TaskMessage struct {
 	// Type indicates the kind of the task to be performed.
 	Type string
 
+	// NextQueue indicates the kind of the task to be performed.
+	NextQueue string
+
 	// Payload holds data needed to process the task.
 	Payload []byte
 
@@ -306,6 +309,7 @@ func EncodeMessage(msg *TaskMessage) ([]byte, error) {
 		Payload:      msg.Payload,
 		Id:           msg.ID,
 		Queue:        msg.Queue,
+		NextQueue:    msg.NextQueue,
 		Retry:        int32(msg.Retry),
 		Retried:      int32(msg.Retried),
 		ErrorMsg:     msg.ErrorMsg,
@@ -330,6 +334,7 @@ func DecodeMessage(data []byte) (*TaskMessage, error) {
 		Payload:      pbmsg.GetPayload(),
 		ID:           pbmsg.GetId(),
 		Queue:        pbmsg.GetQueue(),
+		NextQueue:    pbmsg.GetNextQueue(),
 		Retry:        int(pbmsg.GetRetry()),
 		Retried:      int(pbmsg.GetRetried()),
 		ErrorMsg:     pbmsg.GetErrorMsg(),
