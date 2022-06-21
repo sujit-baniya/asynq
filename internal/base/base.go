@@ -720,6 +720,7 @@ func (l *Lease) IsValid() bool {
 type Broker interface {
 	Ping() error
 	Close() error
+	GetTaskInfo(queue, id string) (*TaskInfo, error)
 	Enqueue(ctx context.Context, msg *TaskMessage) error
 	EnqueueUnique(ctx context.Context, msg *TaskMessage, ttl time.Duration) error
 	Dequeue(qnames ...string) (*TaskMessage, time.Time, error)

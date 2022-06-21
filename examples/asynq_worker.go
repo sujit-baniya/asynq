@@ -1,12 +1,11 @@
 package main
 
 import (
+	"asynq"
 	"asynq/examples/tasks"
 	"context"
+	"fmt"
 	"log"
-	"time"
-
-	"asynq"
 )
 
 const redisAddrWorker = "127.0.0.1:6379"
@@ -19,9 +18,10 @@ func main() {
 			Concurrency: 10,
 			// Optionally specify multiple queues with different priority.
 			Queues: map[string]int{
-				"critical": 6,
-				"default":  3,
-				"low":      1,
+				"critical":      6,
+				"default":       3,
+				"low":           1,
+				"email:deliver": 7,
 			},
 			// See the godoc for other configuration options
 		},
@@ -29,7 +29,7 @@ func main() {
 
 	// mux maps a type to a handler
 	mux := asynq.NewServeMux()
-	mux.Use(loggingMiddleware)
+	mux.Use(FlowMiddleware)
 	mux.HandleFunc(tasks.TypeEmailDelivery, tasks.HandleEmailDeliveryTask)
 	mux.Handle(tasks.TypeImageResize, tasks.NewImageProcessor())
 	srv.AddHandler(mux)
@@ -40,15 +40,20 @@ func main() {
 	}
 }
 
-func loggingMiddleware(h asynq.Handler) asynq.Handler {
+func FlowMiddleware(h asynq.Handler) asynq.Handler {
 	return asynq.HandlerFunc(func(ctx context.Context, t *asynq.Task) error {
-		start := time.Now()
-		log.Printf("Start processing %q", t.Type())
 		err := h.ProcessTask(ctx, t)
 		if err != nil {
 			return err
 		}
-		log.Printf("Finished processing %q: Elapsed Time = %v", t.Type(), time.Since(start))
+		info, err := t.ResultWriter().Broker().GetTaskInfo(t.Type(), t.ResultWriter().TaskID())
+		if err != nil {
+			return err
+		}
+		fmt.Println(info)
+		// task := asynq.NewTask(t.ResultWriter().NextQueue(), info.Result)
+
+		// t.ResultWriter().Broker().Enqueue(context.Background(), )
 		return nil
 	})
 }

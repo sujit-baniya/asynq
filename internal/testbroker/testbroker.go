@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"asynq/internal/base"
+	"github.com/go-redis/redis/v8"
 )
 
 var errRedisDown = errors.New("testutil: redis is down")
@@ -44,6 +44,10 @@ func (tb *TestBroker) Wakeup() {
 	tb.mu.Lock()
 	defer tb.mu.Unlock()
 	tb.sleeping = false
+}
+
+func (tb *TestBroker) GetTaskInfo(queue, id string) (*base.TaskInfo, error) {
+	return nil, nil
 }
 
 func (tb *TestBroker) Enqueue(ctx context.Context, msg *base.TaskMessage) error {

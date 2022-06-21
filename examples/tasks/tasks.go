@@ -34,7 +34,7 @@ func NewEmailDeliveryTask(userID int, tmplID string) (*asynq.Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	return asynq.NewTask(TypeEmailDelivery, payload), nil
+	return asynq.NewTask(TypeEmailDelivery, payload, asynq.Queue(TypeEmailDelivery)), nil
 }
 
 func NewImageResizeTask(src string) (*asynq.Task, error) {
@@ -59,7 +59,9 @@ func HandleEmailDeliveryTask(ctx context.Context, t *asynq.Task) error {
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
 	}
-	fmt.Println(t.ResultWriter().NextQueue())
+	p.UserID = 123
+	d, _ := json.Marshal(p)
+	t.ResultWriter().Write(d)
 	log.Printf("Sending Email to User: user_id=%d, template_id=%s", p.UserID, p.TemplateID)
 	// Email delivery code ...
 	return nil

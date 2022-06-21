@@ -15,7 +15,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("could not create task: %v", err)
 	}
-	info, err := client.Enqueue(task, asynq.NextQueue("test"))
+	info, err := client.Enqueue(task, asynq.NextQueue("test"), asynq.Queue(tasks.TypeEmailDelivery))
 	if err != nil {
 		log.Fatalf("could not enqueue task: %v", err)
 	}

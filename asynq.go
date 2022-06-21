@@ -44,6 +44,8 @@ func (t *Task) Payload() []byte { return t.payload }
 // Only the tasks passed to Handler.ProcessTask have a valid ResultWriter pointer.
 func (t *Task) ResultWriter() *ResultWriter { return t.w }
 
+func (t *Task) Options() []Option { return t.opts }
+
 // NewTask returns a new Task given a type name and payload data.
 // Options can be passed to configure task processing behavior.
 func NewTask(typename string, payload []byte, opts ...Option) *Task {
