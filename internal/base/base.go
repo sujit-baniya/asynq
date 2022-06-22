@@ -732,6 +732,8 @@ type Broker interface {
 	Retry(ctx context.Context, msg *TaskMessage, processAt time.Time, errMsg string, isFailure bool) error
 	Archive(ctx context.Context, msg *TaskMessage, errMsg string) error
 	ForwardIfReady(qnames ...string) error
+	Pause(qname string) error
+	Unpause(qname string) error
 
 	// Group aggregation related methods
 	AddToGroup(ctx context.Context, msg *TaskMessage, gname string) error

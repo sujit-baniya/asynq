@@ -11,26 +11,13 @@ import (
 const redisAddrWorker = "127.0.0.1:6379"
 
 func main() {
-	srv := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: redisAddrWorker},
-		asynq.Config{
-			Concurrency: 10,
-			Queues: map[string]int{
-				"critical":      6,
-				"default":       3,
-				"low":           1,
-				"email:deliver": 7,
-			},
-		},
-	)
-
-	// mux maps a type to a handler
-	mux := asynq.NewServeMux()
-	mux.Use(FlowMiddleware)
-	mux.HandleFunc(tasks.TypeEmailDelivery, tasks.HandleEmailDeliveryTask)
-	srv.AddHandler(mux)
-
-	if err := srv.Run(); err != nil {
+	flow := asynq.NewFlow(redisAddrWorker, 10)
+	flow.AddHandler(tasks.TypeEmailDelivery, tasks.HandleEmailDeliveryTask)
+	err := flow.SetupServer()
+	if err != nil {
+		panic(err)
+	}
+	if err := flow.Start(); err != nil {
 		log.Fatalf("could not run server: %v", err)
 	}
 }

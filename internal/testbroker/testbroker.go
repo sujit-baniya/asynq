@@ -301,3 +301,11 @@ func (tb *TestBroker) ReclaimStaleAggregationSets(qname string) error {
 	}
 	return tb.real.ReclaimStaleAggregationSets(qname)
 }
+
+func (tb *TestBroker) Pause(qname string) error {
+	return nil
+}
+
+func (tb *TestBroker) Unpause(qname string) error {
+	return nil
+}

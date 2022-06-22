@@ -53,7 +53,7 @@ func (mux *ServeMux) ProcessTask(ctx context.Context, task *Task) error {
 }
 
 // Handler returns the handler to use for the given task.
-// It always return a non-nil handler.
+// It always returns a non-nil handler.
 //
 // Handler also returns the registered pattern that matches the task.
 //
