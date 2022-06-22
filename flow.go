@@ -8,12 +8,18 @@ import (
 	"sync"
 )
 
+type Branch struct {
+	Key              string            `json:"key"`
+	ConditionalNodes map[string]string `json:"conditional_nodes"`
+}
+
 type Flow struct {
 	ID          string `json:"id"`
 	NodeHandler map[string]Handler
 	Nodes       []string   `json:"nodes,omitempty"`
 	Edges       [][]string `json:"edges,omitempty"`
 	Loops       [][]string `json:"loops,omitempty"`
+	Branches    []Branch   `json:"branches,omitempty"`
 	FirstNode   string     `json:"first_node"`
 	LastNode    string     `json:"last_node"`
 	Server      *Server
@@ -41,13 +47,12 @@ func NewFlow(redisServer string, concurrency int) *Flow {
 	}
 }
 
-func (flow *Flow) loopMiddleware(h Handler) Handler {
+func (flow *Flow) edgeMiddleware(h Handler) Handler {
 	return HandlerFunc(func(ctx context.Context, task *Task) Result {
 		result := h.ProcessTask(ctx, task)
 		if result.Error != nil {
 			return result
 		}
-		fmt.Println("Loop: ", h.GetType())
 		if h.GetType() == "loop" {
 			var rs []interface{}
 			err := json.Unmarshal(result.Data, &rs)
@@ -87,24 +92,19 @@ func (flow *Flow) loopMiddleware(h Handler) Handler {
 					}
 				}
 			}
-		}
-		return result
-	})
-}
-
-func (flow *Flow) edgeMiddleware(h Handler) Handler {
-	return HandlerFunc(func(ctx context.Context, task *Task) Result {
-		result := h.ProcessTask(ctx, task)
-		if result.Error != nil {
-			return result
-		}
-		if f, ok := flow.edges[task.Type()]; ok {
-			for _, v := range f {
-				t := NewTask(v, result.Data)
-				_, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t)
-				if err != nil {
-					result.Error = err
-					return result
+		} else if h.GetType() == "condition" {
+			// @TODO - Add condition
+			fmt.Println("Condition")
+			fmt.Println(task)
+		} else {
+			if f, ok := flow.edges[task.Type()]; ok {
+				for _, v := range f {
+					t := NewTask(v, result.Data)
+					_, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t)
+					if err != nil {
+						result.Error = err
+						return result
+					}
 				}
 			}
 		}
@@ -124,6 +124,14 @@ func (flow *Flow) AddEdge(in, out string) {
 	flow.Edges = append(flow.Edges, edge)
 }
 
+func (flow *Flow) AddBranch(vertex string, conditions map[string]string) {
+	branch := Branch{
+		Key:              vertex,
+		ConditionalNodes: conditions,
+	}
+	flow.Branches = append(flow.Branches, branch)
+}
+
 func (flow *Flow) AddLoop(in, out string) {
 	loop := []string{in, out}
 	flow.Loops = append(flow.Loops, loop)
@@ -131,16 +139,19 @@ func (flow *Flow) AddLoop(in, out string) {
 
 func (flow *Flow) SetupServer() error {
 	flow.PrepareEdge()
+	flow.PrepareLoop()
 	mux := NewServeMux()
 	for node, handler := range flow.NodeHandler {
+		if handler.GetType() == "input" {
+			flow.FirstNode = node
+		}
 		flow.Server.AddQueue(node, 1)
 		result := mux.Handle(node, handler)
 		if result.Error != nil {
 			return result.Error
 		}
-		fmt.Println(node)
 	}
-	mux.Use(flow.loopMiddleware, flow.edgeMiddleware)
+	mux.Use(flow.edgeMiddleware)
 	flow.handler = mux
 	flow.Server.AddHandler(mux)
 	return nil
@@ -149,6 +160,12 @@ func (flow *Flow) SetupServer() error {
 func (flow *Flow) PrepareEdge() {
 	for _, edge := range flow.Edges {
 		flow.edges[edge[0]] = append(flow.edges[edge[0]], edge[1])
+	}
+}
+
+func (flow *Flow) PrepareLoop() {
+	for _, loop := range flow.Loops {
+		flow.loops[loop[0]] = append(flow.loops[loop[0]], loop[1])
 	}
 }
 
@@ -162,4 +179,11 @@ func (flow *Flow) Start() error {
 
 func (flow *Flow) Shutdown() {
 	flow.Server.Shutdown()
+}
+
+func SendToFlow(redisAddress string, flow *Flow, data []byte) (*TaskInfo, error) {
+	task := NewTask(flow.FirstNode, data)
+	client := NewClient(RedisClientOpt{Addr: redisAddress})
+	defer client.Close()
+	return client.Enqueue(task, Queue(flow.FirstNode))
 }
