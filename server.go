@@ -153,6 +153,14 @@ type Config struct {
 	// The tasks in lower priority queues are processed only when those queues with
 	// higher priorities are empty.
 	StrictPriority bool
+	// RecoverPanicFunc will be inject some actions when workers panic.
+
+	// Example:
+
+	//     func pushPanicErrorToSentry(errMsg string) {
+	//      // perform to push error message to Sentry.
+	//     })
+	RecoverPanicFunc RecoverPanicFunc
 
 	// ErrorHandler handles errors returned by the task handler.
 	//
@@ -265,6 +273,9 @@ type ErrorHandlerFunc func(ctx context.Context, task *Task, err error)
 func (fn ErrorHandlerFunc) HandleError(ctx context.Context, task *Task, err error) {
 	fn(ctx, task, err)
 }
+
+// RecoverPanicFunc is used to inject some actions which will be performed when workers catch panic.
+type RecoverPanicFunc func(errMsg string)
 
 // RetryDelayFunc calculates the retry delay duration for a failed task given
 // the retry count, error, and the task.
@@ -507,20 +518,21 @@ func NewServer(r RedisConnOpt, cfg Config) *Server {
 		cancelations: cancels,
 	})
 	processor := newProcessor(processorParams{
-		logger:          logger,
-		broker:          rd,
-		retryDelayFunc:  delayFunc,
-		baseCtxFn:       baseCtxFn,
-		isFailureFunc:   isFailureFunc,
-		syncCh:          syncCh,
-		cancelations:    cancels,
-		concurrency:     n,
-		queues:          queues,
-		strictPriority:  cfg.StrictPriority,
-		errHandler:      cfg.ErrorHandler,
-		shutdownTimeout: shutdownTimeout,
-		starting:        starting,
-		finished:        finished,
+		logger:           logger,
+		broker:           rd,
+		retryDelayFunc:   delayFunc,
+		baseCtxFn:        baseCtxFn,
+		recoverPanicFunc: cfg.RecoverPanicFunc,
+		isFailureFunc:    isFailureFunc,
+		syncCh:           syncCh,
+		cancelations:     cancels,
+		concurrency:      n,
+		queues:           queues,
+		strictPriority:   cfg.StrictPriority,
+		errHandler:       cfg.ErrorHandler,
+		shutdownTimeout:  shutdownTimeout,
+		starting:         starting,
+		finished:         finished,
 	})
 	recoverer := newRecoverer(recovererParams{
 		logger:         logger,
