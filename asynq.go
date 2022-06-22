@@ -22,8 +22,6 @@ import (
 type Task struct {
 	// typename indicates the type of task to be performed.
 	typename string
-	// nextQueue indicates the type of task to be performed.
-	nextQueue string
 
 	// payload holds data needed to perform the task.
 	payload []byte
@@ -72,9 +70,6 @@ type TaskInfo struct {
 
 	// Queue is the name of the queue in which the task belongs.
 	Queue string
-
-	// NextQueue is the name of the queue in which the task belongs.
-	NextQueue string
 
 	// Type is the type name of the task.
 	Type string
@@ -150,7 +145,6 @@ func newTaskInfo(msg *base.TaskMessage, state base.TaskState, nextProcessAt time
 	info := TaskInfo{
 		ID:            msg.ID,
 		Queue:         msg.Queue,
-		NextQueue:     msg.NextQueue,
 		Type:          msg.Type,
 		Payload:       msg.Payload, // Do we need to make a copy?
 		MaxRetry:      msg.Retry,
@@ -533,11 +527,10 @@ func parseRedisSentinelURI(u *url.URL) (RedisConnOpt, error) {
 // ResultWriter is a client interface to write result data for a task.
 // It writes the data to the redis instance the server is connected to.
 type ResultWriter struct {
-	id        string // task ID this writer is responsible for
-	qname     string // queue name the task belongs to
-	nextQueue string // queue name the task belongs to
-	broker    base.Broker
-	ctx       context.Context // context associated with the task
+	id     string // task ID this writer is responsible for
+	qname  string // queue name the task belongs to
+	broker base.Broker
+	ctx    context.Context // context associated with the task
 }
 
 // Write writes the given data as a result of the task the ResultWriter is associated with.
@@ -557,8 +550,4 @@ func (w *ResultWriter) TaskID() string {
 
 func (w *ResultWriter) Broker() base.Broker {
 	return w.broker
-}
-
-func (w *ResultWriter) NextQueue() string {
-	return w.nextQueue
 }
