@@ -25,7 +25,7 @@ type Flow struct {
 	Server      *Server
 	edges       map[string][]string
 	loops       map[string][]string
-	branches    map[string]string
+	branches    map[string]map[string]string
 	mu          sync.Mutex
 	handler     *ServeMux
 }
@@ -44,6 +44,7 @@ func NewFlow(redisServer string, concurrency int) *Flow {
 		mu:          sync.Mutex{},
 		edges:       make(map[string][]string),
 		loops:       make(map[string][]string),
+		branches:    make(map[string]map[string]string),
 	}
 }
 
@@ -92,19 +93,19 @@ func (flow *Flow) edgeMiddleware(h Handler) Handler {
 					}
 				}
 			}
-		} else if h.GetType() == "condition" {
-			// @TODO - Add condition
-			fmt.Println("Condition")
-			fmt.Println(task)
-		} else {
-			if f, ok := flow.edges[task.Type()]; ok {
-				for _, v := range f {
-					t := NewTask(v, result.Data)
-					_, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t)
-					if err != nil {
-						result.Error = err
-						return result
-					}
+		}
+		if h.GetType() == "condition" {
+			if f, ok := flow.branches[task.Type()]; ok {
+				fmt.Println("Condition: ", f)
+			}
+		}
+		if f, ok := flow.edges[task.Type()]; ok {
+			for _, v := range f {
+				t := NewTask(v, result.Data)
+				_, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t)
+				if err != nil {
+					result.Error = err
+					return result
 				}
 			}
 		}
