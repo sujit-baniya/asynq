@@ -2,18 +2,24 @@ package asynq
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"sync"
 )
 
 type Flow struct {
+	ID          string `json:"id"`
 	NodeHandler map[string]Handler
 	Nodes       []string   `json:"nodes,omitempty"`
 	Edges       [][]string `json:"edges,omitempty"`
+	Loops       [][]string `json:"loops,omitempty"`
 	FirstNode   string     `json:"first_node"`
 	LastNode    string     `json:"last_node"`
 	Server      *Server
 	edges       map[string][]string
+	loops       map[string][]string
+	branches    map[string]string
 	mu          sync.Mutex
 	handler     *ServeMux
 }
@@ -26,14 +32,67 @@ func NewFlow(redisServer string, concurrency int) *Flow {
 		},
 	)
 	return &Flow{
+		ID:          uuid.New().String(),
 		NodeHandler: make(map[string]Handler),
 		Server:      srv,
 		mu:          sync.Mutex{},
 		edges:       make(map[string][]string),
+		loops:       make(map[string][]string),
 	}
 }
 
-func (flow *Flow) FlowMiddleware(h Handler) Handler {
+func (flow *Flow) loopMiddleware(h Handler) Handler {
+	return HandlerFunc(func(ctx context.Context, task *Task) Result {
+		result := h.ProcessTask(ctx, task)
+		if result.Error != nil {
+			return result
+		}
+		fmt.Println("Loop: ", h.GetType())
+		if h.GetType() == "loop" {
+			var rs []interface{}
+			err := json.Unmarshal(result.Data, &rs)
+			if err != nil {
+				result.Error = err
+				return result
+			}
+			for _, single := range rs {
+				single := single
+				payload := result.Data
+				currentData := make(map[string]interface{})
+				switch s := single.(type) {
+				case map[string]interface{}:
+					currentData = s
+				}
+				if currentData != nil {
+					payload, err = json.Marshal(currentData)
+					if err != nil {
+						result.Error = err
+						return result
+					}
+				} else {
+					payload, err = json.Marshal(single)
+					if err != nil {
+						result.Error = err
+						return result
+					}
+				}
+				if f, ok := flow.loops[task.Type()]; ok {
+					for _, v := range f {
+						t := NewTask(v, payload)
+						_, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t)
+						if err != nil {
+							result.Error = err
+							return result
+						}
+					}
+				}
+			}
+		}
+		return result
+	})
+}
+
+func (flow *Flow) edgeMiddleware(h Handler) Handler {
 	return HandlerFunc(func(ctx context.Context, task *Task) Result {
 		result := h.ProcessTask(ctx, task)
 		if result.Error != nil {
@@ -42,11 +101,11 @@ func (flow *Flow) FlowMiddleware(h Handler) Handler {
 		if f, ok := flow.edges[task.Type()]; ok {
 			for _, v := range f {
 				t := NewTask(v, result.Data)
-				ta, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t)
+				_, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t)
 				if err != nil {
-					panic(err)
+					result.Error = err
+					return result
 				}
-				fmt.Println(ta, t.Type())
 			}
 		}
 		return result
@@ -65,6 +124,11 @@ func (flow *Flow) AddEdge(in, out string) {
 	flow.Edges = append(flow.Edges, edge)
 }
 
+func (flow *Flow) AddLoop(in, out string) {
+	loop := []string{in, out}
+	flow.Loops = append(flow.Loops, loop)
+}
+
 func (flow *Flow) SetupServer() error {
 	flow.PrepareEdge()
 	mux := NewServeMux()
@@ -76,7 +140,7 @@ func (flow *Flow) SetupServer() error {
 		}
 		fmt.Println(node)
 	}
-	mux.Use(flow.FlowMiddleware)
+	mux.Use(flow.loopMiddleware, flow.edgeMiddleware)
 	flow.handler = mux
 	flow.Server.AddHandler(mux)
 	return nil

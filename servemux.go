@@ -52,6 +52,18 @@ func (mux *ServeMux) ProcessTask(ctx context.Context, task *Task) Result {
 	return h.ProcessTask(ctx, task)
 }
 
+// GetType dispatches the task to the handler whose
+// pattern most closely matches the task type.
+func (mux *ServeMux) GetType() string {
+	return "handler"
+}
+
+// GetKey dispatches the task to the handler whose
+// pattern most closely matches the task type.
+func (mux *ServeMux) GetKey() string {
+	return ""
+}
+
 // Handler returns the handler to use for the given task.
 // It always returns a non-nil handler.
 //

@@ -597,6 +597,8 @@ func NewServer(r RedisConnOpt, cfg Config) *Server {
 // skipped and the task will be immediately archived instead.
 type Handler interface {
 	ProcessTask(context.Context, *Task) Result
+	GetType() string
+	GetKey() string
 }
 
 type Result struct {
@@ -613,6 +615,16 @@ type HandlerFunc func(context.Context, *Task) Result
 // ProcessTask calls fn(ctx, task)
 func (fn HandlerFunc) ProcessTask(ctx context.Context, task *Task) Result {
 	return fn(ctx, task)
+}
+
+// GetType c string
+func (fn HandlerFunc) GetType() string {
+	return "server"
+}
+
+// GetKey c string
+func (fn HandlerFunc) GetKey() string {
+	return ""
 }
 
 // ErrServerClosed indicates that the operation is now illegal because of the server has been shutdown.
