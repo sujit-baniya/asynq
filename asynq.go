@@ -22,6 +22,8 @@ import (
 type Task struct {
 	// typename indicates the type of task to be performed.
 	typename string
+	// flowID indicates the type of task to be performed.
+	flowID string
 
 	// payload holds data needed to perform the task.
 	payload []byte
@@ -70,6 +72,9 @@ type TaskInfo struct {
 
 	// Queue is the name of the queue in which the task belongs.
 	Queue string
+
+	// FlowID is the name of the queue in which the task belongs.
+	FlowID string
 
 	// Type is the type name of the task.
 	Type string
@@ -145,6 +150,7 @@ func newTaskInfo(msg *base.TaskMessage, state base.TaskState, nextProcessAt time
 	info := TaskInfo{
 		ID:            msg.ID,
 		Queue:         msg.Queue,
+		FlowID:        msg.FlowID,
 		Type:          msg.Type,
 		Payload:       msg.Payload, // Do we need to make a copy?
 		MaxRetry:      msg.Retry,
@@ -529,6 +535,7 @@ func parseRedisSentinelURI(u *url.URL) (RedisConnOpt, error) {
 type ResultWriter struct {
 	id     string // task ID this writer is responsible for
 	qname  string // queue name the task belongs to
+	flowID string // queue name the task belongs to
 	broker base.Broker
 	ctx    context.Context // context associated with the task
 }
@@ -550,4 +557,8 @@ func (w *ResultWriter) TaskID() string {
 
 func (w *ResultWriter) Broker() base.Broker {
 	return w.broker
+}
+
+func (w *ResultWriter) FlowID() string {
+	return w.flowID
 }

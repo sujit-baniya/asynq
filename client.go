@@ -67,6 +67,7 @@ type Option interface {
 type (
 	retryOption     int
 	queueOption     string
+	flowIDOption    string
 	taskIDOption    string
 	timeoutOption   time.Duration
 	deadlineOption  time.Time
@@ -100,6 +101,15 @@ func Queue(name string) Option {
 func (name queueOption) String() string     { return fmt.Sprintf("Queue(%q)", string(name)) }
 func (name queueOption) Type() OptionType   { return QueueOpt }
 func (name queueOption) Value() interface{} { return string(name) }
+
+// FlowID returns an option to specify the queue to enqueue the task into.
+func FlowID(name string) Option {
+	return flowIDOption(name)
+}
+
+func (name flowIDOption) String() string     { return string(name) }
+func (name flowIDOption) Type() OptionType   { return QueueOpt }
+func (name flowIDOption) Value() interface{} { return string(name) }
 
 // TaskID returns an option to specify the task ID.
 func TaskID(id string) Option {
@@ -219,6 +229,7 @@ var ErrTaskIDConflict = errors.New("task ID conflicts with another task")
 type option struct {
 	retry     int
 	queue     string
+	flowID    string
 	taskID    string
 	timeout   time.Duration
 	deadline  time.Time
@@ -236,6 +247,7 @@ func composeOptions(opts ...Option) (option, error) {
 	res := option{
 		retry:     defaultMaxRetry,
 		queue:     base.DefaultQueueName,
+		flowID:    "",
 		taskID:    uuid.NewString(),
 		timeout:   0, // do not set to defaultTimeout here
 		deadline:  time.Time{},
@@ -251,6 +263,8 @@ func composeOptions(opts ...Option) (option, error) {
 				return option{}, err
 			}
 			res.queue = qname
+		case flowIDOption:
+			res.flowID = string(opt)
 		case taskIDOption:
 			id := string(opt)
 			if isBlank(id) {
@@ -372,6 +386,7 @@ func (c *Client) EnqueueContext(ctx context.Context, task *Task, opts ...Option)
 		Type:      task.Type(),
 		Payload:   task.Payload(),
 		Queue:     opt.queue,
+		FlowID:    opt.flowID,
 		Retry:     opt.retry,
 		Deadline:  deadline.Unix(),
 		Timeout:   int64(timeout.Seconds()),
@@ -439,6 +454,7 @@ func EnqueueContext(broker base.Broker, ctx context.Context, task *Task, opts ..
 		Type:      task.Type(),
 		Payload:   task.Payload(),
 		Queue:     opt.queue,
+		FlowID:    opt.flowID,
 		Retry:     opt.retry,
 		Deadline:  deadline.Unix(),
 		Timeout:   int64(timeout.Seconds()),

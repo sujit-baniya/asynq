@@ -199,5 +199,5 @@ func SendToFlow(redisAddress string, flow *Flow, data []byte) (*TaskInfo, error)
 	task := NewTask(flow.FirstNode, data)
 	client := NewClient(RedisClientOpt{Addr: redisAddress})
 	defer client.Close()
-	return client.Enqueue(task, Queue(flow.FirstNode))
+	return client.Enqueue(task, Queue(flow.FirstNode), FlowID(flow.ID))
 }

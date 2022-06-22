@@ -237,6 +237,9 @@ type TaskMessage struct {
 	// Type indicates the kind of the task to be performed.
 	Type string
 
+	// FlowID indicates the kind of the task to be performed.
+	FlowID string
+
 	// Payload holds data needed to process the task.
 	Payload []byte
 
@@ -306,6 +309,7 @@ func EncodeMessage(msg *TaskMessage) ([]byte, error) {
 		Payload:      msg.Payload,
 		Id:           msg.ID,
 		Queue:        msg.Queue,
+		FlowId:       msg.FlowID,
 		Retry:        int32(msg.Retry),
 		Retried:      int32(msg.Retried),
 		ErrorMsg:     msg.ErrorMsg,
@@ -330,6 +334,7 @@ func DecodeMessage(data []byte) (*TaskMessage, error) {
 		Payload:      pbmsg.GetPayload(),
 		ID:           pbmsg.GetId(),
 		Queue:        pbmsg.GetQueue(),
+		FlowID:       pbmsg.GetFlowId(),
 		Retry:        int(pbmsg.GetRetry()),
 		Retried:      int(pbmsg.GetRetried()),
 		ErrorMsg:     pbmsg.GetErrorMsg(),

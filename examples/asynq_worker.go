@@ -38,6 +38,7 @@ func (e *GetData) ProcessTask(ctx context.Context, task *asynq.Task) asynq.Resul
 		panic(err)
 	}
 	fmt.Println("Getting Data...", data)
+	fmt.Println(task.Options())
 	return asynq.Result{Data: task.Payload()}
 }
 
