@@ -31,14 +31,16 @@ func NewEmailDeliveryTask(userID int, tmplID string) (*asynq.Task, error) {
 	return asynq.NewTask(TypeEmailDelivery, payload, asynq.Queue(TypeEmailDelivery)), nil
 }
 
-func HandleEmailDeliveryTask(ctx context.Context, t *asynq.Task) error {
+func HandleEmailDeliveryTask(ctx context.Context, t *asynq.Task) asynq.Result {
 	var p EmailDeliveryPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+		return asynq.Result{
+			Data:  nil,
+			Error: fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry),
+		}
 	}
 	p.UserID = 123
 	d, _ := json.Marshal(p)
-	t.ResultWriter().Write(d)
 	log.Printf("Sending Email to User: user_id=%d, template_id=%s", p.UserID, p.TemplateID)
-	return nil
+	return asynq.Result{Data: d}
 }

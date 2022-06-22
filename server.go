@@ -596,17 +596,22 @@ func NewServer(r RedisConnOpt, cfg Config) *Server {
 // If the returned error is SkipRetry or an error wraps SkipRetry, retry is
 // skipped and the task will be immediately archived instead.
 type Handler interface {
-	ProcessTask(context.Context, *Task) error
+	ProcessTask(context.Context, *Task) Result
+}
+
+type Result struct {
+	Data  []byte `json:"data"`
+	Error error  `json:"error"`
 }
 
 // The HandlerFunc type is an adapter to allow the use of
 // ordinary functions as a Handler. If f is a function
 // with the appropriate signature, HandlerFunc(f) is a
 // Handler that calls f.
-type HandlerFunc func(context.Context, *Task) error
+type HandlerFunc func(context.Context, *Task) Result
 
 // ProcessTask calls fn(ctx, task)
-func (fn HandlerFunc) ProcessTask(ctx context.Context, task *Task) error {
+func (fn HandlerFunc) ProcessTask(ctx context.Context, task *Task) Result {
 	return fn(ctx, task)
 }
 
@@ -735,7 +740,7 @@ func (srv *Server) AddHandler(handler *ServeMux) {
 	srv.handler = handler
 }
 
-func (srv *Server) AddQueueHandler(queue string, handler func(ctx context.Context, t *Task) error) {
+func (srv *Server) AddQueueHandler(queue string, handler func(ctx context.Context, t *Task) Result) {
 	srv.handler.HandleFunc(queue, handler)
 }
 

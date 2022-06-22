@@ -47,7 +47,7 @@ func NewServeMux() *ServeMux {
 
 // ProcessTask dispatches the task to the handler whose
 // pattern most closely matches the task type.
-func (mux *ServeMux) ProcessTask(ctx context.Context, task *Task) error {
+func (mux *ServeMux) ProcessTask(ctx context.Context, task *Task) Result {
 	h, _ := mux.Handler(task)
 	return h.ProcessTask(ctx, task)
 }
@@ -95,18 +95,27 @@ func (mux *ServeMux) match(typename string) (h Handler, pattern string) {
 
 // Handle registers the handler for the given pattern.
 // If a handler already exists for pattern, Handle panics.
-func (mux *ServeMux) Handle(pattern string, handler Handler) error {
+func (mux *ServeMux) Handle(pattern string, handler Handler) Result {
 	mux.mu.Lock()
 	defer mux.mu.Unlock()
 
 	if strings.TrimSpace(pattern) == "" {
-		return errors.New("asynq: invalid pattern")
+		return Result{
+			Data:  nil,
+			Error: errors.New("asynq: invalid pattern"),
+		}
 	}
 	if handler == nil {
-		return errors.New("asynq: nil handler")
+		return Result{
+			Data:  nil,
+			Error: errors.New("asynq: nil handler"),
+		}
 	}
 	if _, exist := mux.m[pattern]; exist {
-		return errors.New("asynq: multiple registrations for " + pattern)
+		return Result{
+			Data:  nil,
+			Error: errors.New("asynq: multiple registrations for " + pattern),
+		}
 	}
 
 	if mux.m == nil {
@@ -115,7 +124,7 @@ func (mux *ServeMux) Handle(pattern string, handler Handler) error {
 	e := muxEntry{h: handler, pattern: pattern}
 	mux.m[pattern] = e
 	mux.es = appendSorted(mux.es, e)
-	return nil
+	return Result{}
 }
 
 func appendSorted(es []muxEntry, e muxEntry) []muxEntry {
@@ -134,9 +143,12 @@ func appendSorted(es []muxEntry, e muxEntry) []muxEntry {
 }
 
 // HandleFunc registers the handler function for the given pattern.
-func (mux *ServeMux) HandleFunc(pattern string, handler func(context.Context, *Task) error) error {
+func (mux *ServeMux) HandleFunc(pattern string, handler func(context.Context, *Task) Result) Result {
 	if handler == nil {
-		return errors.New("asynq: nil handler")
+		return Result{
+			Data:  nil,
+			Error: errors.New("asynq: nil handler"),
+		}
 	}
 	return mux.Handle(pattern, HandlerFunc(handler))
 }
@@ -152,8 +164,11 @@ func (mux *ServeMux) Use(mws ...MiddlewareFunc) {
 }
 
 // NotFound returns an error indicating that the handler was not found for the given task.
-func NotFound(ctx context.Context, task *Task) error {
-	return fmt.Errorf("handler not found for task %q", task.Type())
+func NotFound(ctx context.Context, task *Task) Result {
+	return Result{
+		Data:  nil,
+		Error: fmt.Errorf("handler not found for task %q", task.Type()),
+	}
 }
 
 // NotFoundHandler returns a simple task handler that returns a ``not found`` error.

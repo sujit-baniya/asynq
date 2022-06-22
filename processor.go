@@ -120,10 +120,15 @@ func newProcessor(params processorParams) *processor {
 		quit:             make(chan struct{}),
 		abort:            make(chan struct{}),
 		errHandler:       params.errHandler,
-		handler:          HandlerFunc(func(ctx context.Context, t *Task) error { return fmt.Errorf("handler not set") }),
-		shutdownTimeout:  params.shutdownTimeout,
-		starting:         params.starting,
-		finished:         params.finished,
+		handler: HandlerFunc(func(ctx context.Context, t *Task) Result {
+			return Result{
+				Data:  nil,
+				Error: fmt.Errorf("handler not set"),
+			}
+		}),
+		shutdownTimeout: params.shutdownTimeout,
+		starting:        params.starting,
+		finished:        params.finished,
 	}
 }
 
@@ -222,17 +227,16 @@ func (p *processor) exec() {
 			default:
 			}
 
-			resCh := make(chan error, 1)
+			resCh := make(chan Result, 1)
 			go func() {
 				task := newTask(
 					msg.Type,
 					msg.Payload,
 					&ResultWriter{
-						id:        msg.ID,
-						qname:     msg.Queue,
-						nextQueue: msg.NextQueue,
-						broker:    p.broker,
-						ctx:       ctx,
+						id:     msg.ID,
+						qname:  msg.Queue,
+						broker: p.broker,
+						ctx:    ctx,
 					},
 				)
 				resCh <- p.perform(ctx, task)
@@ -252,8 +256,8 @@ func (p *processor) exec() {
 				p.handleFailedMessage(ctx, lease, msg, ctx.Err())
 				return
 			case resErr := <-resCh:
-				if resErr != nil {
-					p.handleFailedMessage(ctx, lease, msg, resErr)
+				if resErr.Error != nil {
+					p.handleFailedMessage(ctx, lease, msg, resErr.Error)
 					return
 				}
 				p.handleSucceededMessage(lease, msg)
@@ -418,7 +422,7 @@ func (p *processor) queues() []string {
 // perform calls the handler with the given task.
 // If the call returns without panic, it simply returns the value,
 // otherwise, it recovers from panic and returns an error.
-func (p *processor) perform(ctx context.Context, task *Task) (err error) {
+func (p *processor) perform(ctx context.Context, task *Task) (result Result) {
 	defer func() {
 		if x := recover(); x != nil {
 			errMsg := string(debug.Stack())
@@ -435,9 +439,9 @@ func (p *processor) perform(ctx context.Context, task *Task) (err error) {
 
 			// Include the file and line number info in the error, if runtime.Caller returned ok.
 			if ok {
-				err = fmt.Errorf("panic [%s:%d]: %v", file, line, x)
+				result.Error = fmt.Errorf("panic [%s:%d]: %v", file, line, x)
 			} else {
-				err = fmt.Errorf("panic: %v", x)
+				result.Error = fmt.Errorf("panic: %v", x)
 			}
 		}
 	}()
