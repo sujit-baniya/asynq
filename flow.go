@@ -3,7 +3,6 @@ package asynq
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/google/uuid"
 	"sync"
 )
@@ -95,8 +94,15 @@ func (flow *Flow) edgeMiddleware(h Handler) Handler {
 			}
 		}
 		if h.GetType() == "condition" {
-			if f, ok := flow.branches[task.Type()]; ok {
-				fmt.Println("Condition: ", f)
+			if f, ok := flow.branches[task.Type()]; ok && result.Status != "" {
+				if c, o := f[result.Status]; o {
+					t := NewTask(c, result.Data)
+					_, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t)
+					if err != nil {
+						result.Error = err
+						return result
+					}
+				}
 			}
 		}
 		if f, ok := flow.edges[task.Type()]; ok {
@@ -141,6 +147,7 @@ func (flow *Flow) AddLoop(in, out string) {
 func (flow *Flow) SetupServer() error {
 	flow.PrepareEdge()
 	flow.PrepareLoop()
+	flow.PrepareBranch()
 	mux := NewServeMux()
 	for node, handler := range flow.NodeHandler {
 		if handler.GetType() == "input" {
@@ -156,6 +163,12 @@ func (flow *Flow) SetupServer() error {
 	flow.handler = mux
 	flow.Server.AddHandler(mux)
 	return nil
+}
+
+func (flow *Flow) PrepareBranch() {
+	for _, branch := range flow.Branches {
+		flow.branches[branch.Key] = branch.ConditionalNodes
+	}
 }
 
 func (flow *Flow) PrepareEdge() {

@@ -602,8 +602,9 @@ type Handler interface {
 }
 
 type Result struct {
-	Data  []byte `json:"data"`
-	Error error  `json:"error"`
+	Status string `json:"status"`
+	Data   []byte `json:"data"`
+	Error  error  `json:"error"`
 }
 
 // The HandlerFunc type is an adapter to allow the use of
