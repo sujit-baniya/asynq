@@ -54,7 +54,7 @@ func (flow *Flow) edgeMiddleware(h Handler) Handler {
 			return result
 		}
 		if h.GetType() == "loop" {
-			var rs []interface{}
+			var rs []any
 			err := json.Unmarshal(result.Data, &rs)
 			if err != nil {
 				result.Error = err
@@ -63,9 +63,9 @@ func (flow *Flow) edgeMiddleware(h Handler) Handler {
 			for _, single := range rs {
 				single := single
 				payload := result.Data
-				currentData := make(map[string]interface{})
+				currentData := make(map[string]any)
 				switch s := single.(type) {
-				case map[string]interface{}:
+				case map[string]any:
 					currentData = s
 				}
 				if currentData != nil {
