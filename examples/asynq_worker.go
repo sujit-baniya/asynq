@@ -88,12 +88,12 @@ func main() {
 	go func() {
 		data := []map[string]any{
 			{
-				"phone": "+9779856034616",
-				"email": "itsursujit@gmail.com",
+				"phone": "+123456789",
+				"email": "abc.xyz@gmail.com",
 			},
 			{
-				"phone": "+9779856034617",
-				"email": "s.baniya.np@gmail.com",
+				"phone": "+98765412",
+				"email": "xyz.abc@gmail.com",
 			},
 		}
 		bt, _ := json.Marshal(data)
