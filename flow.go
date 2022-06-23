@@ -95,6 +95,12 @@ func (flow *Flow) edgeMiddleware(h Handler) Handler {
 				currentData := make(map[string]any)
 				switch s := single.(type) {
 				case map[string]any:
+					if _, ok := s["oarkflow_id"]; !ok {
+						s["oarkflow_id"] = uuid.NewString()
+					}
+					if _, ok := s["flow_id"]; !ok {
+						s["flow_id"] = task.FlowID
+					}
 					currentData = s
 				}
 				if currentData != nil {
@@ -227,6 +233,19 @@ func (flow *Flow) Shutdown() {
 }
 
 func SendToFlow(redisAddress string, flow *Flow, data []byte) (*TaskInfo, error) {
+	var multiData []map[string]any
+	var singleData map[string]any
+	err := json.Unmarshal(data, &multiData)
+	if err != nil {
+		err = json.Unmarshal(data, &singleData)
+		if err != nil {
+			return nil, err
+		}
+		singleData["oarkflow_id"] = uuid.NewString()
+		singleData["flow_id"] = flow.ID
+		multiData = []map[string]any{singleData}
+	}
+	data, _ = json.Marshal(multiData)
 	task := NewTask(flow.FirstNode, data, FlowID(flow.ID))
 	client := NewClient(RedisClientOpt{Addr: redisAddress})
 	defer client.Close()

@@ -28,16 +28,6 @@ type GetData struct {
 	Operation
 }
 
-func (e *GetData) ProcessTask(ctx context.Context, task *asynq.Task) asynq.Result {
-	var data []map[string]any
-	err := json.Unmarshal(task.Payload(), &data)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("Getting Data...", data)
-	return asynq.Result{Data: task.Payload()}
-}
-
 type Loop struct {
 	Operation
 }

@@ -267,12 +267,12 @@ func (p *processor) requeue(l *base.Lease, msg *base.TaskMessage) {
 func (p *processor) handleSucceededMessage(ctx context.Context, l *base.Lease, msg *base.TaskMessage) {
 	if msg.Retention > 0 {
 		if p.completeHandler != nil {
-			p.completeHandler.HandleComplete(ctx, NewTask(msg.Type, msg.Payload, FlowID(msg.FlowID)))
+			p.completeHandler.HandleComplete(ctx, NewTask(msg.Type, msg.Payload, FlowID(msg.FlowID), TaskID(msg.ID)))
 		}
 		p.markAsComplete(l, msg)
 	} else {
 		if p.doneHandler != nil {
-			p.doneHandler.HandleDone(ctx, NewTask(msg.Type, msg.Payload, FlowID(msg.FlowID)))
+			p.doneHandler.HandleDone(ctx, NewTask(msg.Type, msg.Payload, FlowID(msg.FlowID), TaskID(msg.ID)))
 		}
 		p.markAsDone(l, msg)
 	}
@@ -325,7 +325,7 @@ var SkipRetry = errors.New("skip retry for the task")
 
 func (p *processor) handleFailedMessage(ctx context.Context, l *base.Lease, msg *base.TaskMessage, err error) {
 	if p.errHandler != nil {
-		p.errHandler.HandleError(ctx, NewTask(msg.Type, msg.Payload, FlowID(msg.FlowID)), err)
+		p.errHandler.HandleError(ctx, NewTask(msg.Type, msg.Payload, FlowID(msg.FlowID), TaskID(msg.ID)), err)
 	}
 	if !p.isFailureFunc(err) {
 		// retry the task without marking it as failed
