@@ -3,13 +3,22 @@ package main
 import (
 	"asynq"
 	"encoding/json"
+	"fmt"
 	"log"
+	"syscall"
+	"time"
 )
 
 const redisAddrWorker = "127.0.0.1:6379"
 
 func main() {
 	flow := asynq.NewFlow(redisAddrWorker, 10)
+	go func() {
+		time.Sleep(15 * time.Second)
+		fmt.Println("Shutting down")
+		flow.Shutdown()
+		syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+	}()
 	flow.AddHandler("email:deliver", &EmailDelivery{Operation{Type: "process"}})
 	flow.AddHandler("prepare:email", &PrepareEmail{Operation{Type: "process"}})
 	flow.AddHandler("get:input", &GetData{Operation{Type: "input"}})

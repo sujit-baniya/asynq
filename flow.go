@@ -162,6 +162,9 @@ func (flow *Flow) SetupServer() error {
 		if handler.GetType() == "input" {
 			flow.FirstNode = node
 		}
+		if handler.GetType() == "output" {
+			flow.LastNode = node
+		}
 		flow.server.AddQueue(node, 1)
 		result := mux.Handle(node, handler)
 		if result.Error != nil {
