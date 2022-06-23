@@ -98,8 +98,8 @@ func (flow *Flow) edgeMiddleware(h Handler) Handler {
 					if _, ok := s["oarkflow_id"]; !ok {
 						s["oarkflow_id"] = uuid.NewString()
 					}
-					if _, ok := s["flow_id"]; !ok {
-						s["flow_id"] = task.FlowID
+					if _, ok := s["oarkflow_flow_id"]; !ok {
+						s["oarkflow_flow_id"] = task.FlowID
 					}
 					currentData = s
 				}
@@ -242,7 +242,7 @@ func SendToFlow(redisAddress string, flow *Flow, data []byte) (*TaskInfo, error)
 			return nil, err
 		}
 		singleData["oarkflow_id"] = uuid.NewString()
-		singleData["flow_id"] = flow.ID
+		singleData["oarkflow_flow_id"] = flow.ID
 		multiData = []map[string]any{singleData}
 	}
 	data, _ = json.Marshal(multiData)
@@ -257,7 +257,7 @@ func SendToFlow(redisAddress string, flow *Flow, data []byte) (*TaskInfo, error)
 	return client.Enqueue(task, ops...)
 }
 
-func MergeMap(map1 map[string]interface{}, map2 map[string]interface{}) map[string]interface{} {
+func MergeMap(map1 map[string]any, map2 map[string]any) map[string]any {
 	for k, m := range map2 {
 		if _, ok := map1[k]; !ok {
 			map1[k] = m

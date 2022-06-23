@@ -742,7 +742,7 @@ func file_asynq_proto_rawDescGZIP() []byte {
 }
 
 var file_asynq_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
-var file_asynq_proto_goTypes = []interface{}{
+var file_asynq_proto_goTypes = []any{
 	(*TaskMessage)(nil),           // 0: asynq.TaskMessage
 	(*ServerInfo)(nil),            // 1: asynq.ServerInfo
 	(*WorkerInfo)(nil),            // 2: asynq.WorkerInfo
@@ -772,7 +772,7 @@ func file_asynq_proto_init() {
 		return
 	}
 	if !protoimpl.UnsafeEnabled {
-		file_asynq_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+		file_asynq_proto_msgTypes[0].Exporter = func(v any, i int) any {
 			switch v := v.(*TaskMessage); i {
 			case 0:
 				return &v.state
@@ -784,7 +784,7 @@ func file_asynq_proto_init() {
 				return nil
 			}
 		}
-		file_asynq_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+		file_asynq_proto_msgTypes[1].Exporter = func(v any, i int) any {
 			switch v := v.(*ServerInfo); i {
 			case 0:
 				return &v.state
@@ -796,7 +796,7 @@ func file_asynq_proto_init() {
 				return nil
 			}
 		}
-		file_asynq_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+		file_asynq_proto_msgTypes[2].Exporter = func(v any, i int) any {
 			switch v := v.(*WorkerInfo); i {
 			case 0:
 				return &v.state
@@ -808,7 +808,7 @@ func file_asynq_proto_init() {
 				return nil
 			}
 		}
-		file_asynq_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+		file_asynq_proto_msgTypes[3].Exporter = func(v any, i int) any {
 			switch v := v.(*SchedulerEntry); i {
 			case 0:
 				return &v.state
@@ -820,7 +820,7 @@ func file_asynq_proto_init() {
 				return nil
 			}
 		}
-		file_asynq_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+		file_asynq_proto_msgTypes[4].Exporter = func(v any, i int) any {
 			switch v := v.(*SchedulerEnqueueEvent); i {
 			case 0:
 				return &v.state

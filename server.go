@@ -320,20 +320,20 @@ type RetryDelayFunc func(n int, e error, t *Task) time.Duration
 // Logger supports logging at various log levels.
 type Logger interface {
 	// Debug logs a message at Debug level.
-	Debug(args ...interface{})
+	Debug(args ...any)
 
 	// Info logs a message at Info level.
-	Info(args ...interface{})
+	Info(args ...any)
 
 	// Warn logs a message at Warning level.
-	Warn(args ...interface{})
+	Warn(args ...any)
 
 	// Error logs a message at Error level.
-	Error(args ...interface{})
+	Error(args ...any)
 
 	// Fatal logs a message at Fatal level
 	// and process will exit with status set to 1.
-	Fatal(args ...interface{})
+	Fatal(args ...any)
 }
 
 // LogLevel represents logging level.

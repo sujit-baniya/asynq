@@ -4,7 +4,9 @@ import (
 	"asynq"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
+	"time"
 )
 
 const redisAddrWorker = "127.0.0.1:6379"
@@ -54,6 +56,11 @@ func main() {
 		}
 		bt, _ := json.Marshal(data)
 		asynq.SendToFlow(redisAddrWorker, flow, bt)
+	}()
+	go func() {
+		time.Sleep(5 * time.Second)
+		flow.Shutdown()
+		fmt.Println("Server is shutdown")
 	}()
 	if err := flow.Start(); err != nil {
 		log.Fatalf("could not run server: %v", err)
