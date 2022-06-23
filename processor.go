@@ -238,6 +238,7 @@ func (p *processor) exec() {
 						broker: p.broker,
 						ctx:    ctx,
 					},
+					msg.FlowID,
 				)
 				resCh <- p.perform(ctx, task)
 			}()

@@ -353,71 +353,7 @@ func (c *Client) Enqueue(task *Task, opts ...Option) (*TaskInfo, error) {
 //
 // The first argument context applies to the enqueue operation. To specify task timeout and deadline, use Timeout and Deadline option instead.
 func (c *Client) EnqueueContext(ctx context.Context, task *Task, opts ...Option) (*TaskInfo, error) {
-	if task == nil {
-		return nil, fmt.Errorf("task cannot be nil")
-	}
-	if strings.TrimSpace(task.Type()) == "" {
-		return nil, fmt.Errorf("task typename cannot be empty")
-	}
-	// merge task options with the options provided at enqueue time.
-	opts = append(task.opts, opts...)
-	opt, err := composeOptions(opts...)
-	if err != nil {
-		return nil, err
-	}
-	deadline := noDeadline
-	if !opt.deadline.IsZero() {
-		deadline = opt.deadline
-	}
-	timeout := noTimeout
-	if opt.timeout != 0 {
-		timeout = opt.timeout
-	}
-	if deadline.Equal(noDeadline) && timeout == noTimeout {
-		// If neither deadline nor timeout are set, use default timeout.
-		timeout = defaultTimeout
-	}
-	var uniqueKey string
-	if opt.uniqueTTL > 0 {
-		uniqueKey = base.UniqueKey(opt.queue, task.Type(), task.Payload())
-	}
-	msg := &base.TaskMessage{
-		ID:        opt.taskID,
-		Type:      task.Type(),
-		Payload:   task.Payload(),
-		Queue:     opt.queue,
-		FlowID:    opt.flowID,
-		Retry:     opt.retry,
-		Deadline:  deadline.Unix(),
-		Timeout:   int64(timeout.Seconds()),
-		UniqueKey: uniqueKey,
-		GroupKey:  opt.group,
-		Retention: int64(opt.retention.Seconds()),
-	}
-	now := time.Now()
-	var state base.TaskState
-	if opt.processAt.After(now) {
-		err = c.schedule(ctx, msg, opt.processAt, opt.uniqueTTL)
-		state = base.TaskStateScheduled
-	} else if opt.group != "" {
-		// Use zero value for processAt since we don't know when the task will be aggregated and processed.
-		opt.processAt = time.Time{}
-		err = c.addToGroup(ctx, msg, opt.group, opt.uniqueTTL)
-		state = base.TaskStateAggregating
-	} else {
-		opt.processAt = now
-		err = c.enqueue(ctx, msg, opt.uniqueTTL)
-		state = base.TaskStatePending
-	}
-	switch {
-	case errors.Is(err, errors.ErrDuplicateTask):
-		return nil, fmt.Errorf("%w", ErrDuplicateTask)
-	case errors.Is(err, errors.ErrTaskIdConflict):
-		return nil, fmt.Errorf("%w", ErrTaskIDConflict)
-	case err != nil:
-		return nil, err
-	}
-	return newTaskInfo(msg, state, opt.processAt, nil), nil
+	return EnqueueContext(c.broker, ctx, task, opts...)
 }
 
 func EnqueueContext(broker base.Broker, ctx context.Context, task *Task, opts ...Option) (*TaskInfo, error) {

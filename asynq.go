@@ -22,8 +22,8 @@ import (
 type Task struct {
 	// typename indicates the type of task to be performed.
 	typename string
-	// flowID indicates the type of task to be performed.
-	flowID string
+	// FlowID indicates the type of task to be performed.
+	FlowID string
 
 	// payload holds data needed to perform the task.
 	payload []byte
@@ -57,11 +57,16 @@ func NewTask(typename string, payload []byte, opts ...Option) *Task {
 }
 
 // newTask creates a task with the given typename, payload and ResultWriter.
-func newTask(typename string, payload []byte, w *ResultWriter) *Task {
+func newTask(typename string, payload []byte, w *ResultWriter, flowID ...string) *Task {
+	var f string
+	if len(flowID) > 0 {
+		f = flowID[0]
+	}
 	return &Task{
 		typename: typename,
 		payload:  payload,
 		w:        w,
+		FlowID:   f,
 	}
 }
 

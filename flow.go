@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/google/uuid"
 	"sync"
+	"time"
 )
 
 type Branch struct {
@@ -83,8 +84,8 @@ func (flow *Flow) edgeMiddleware(h Handler) Handler {
 				}
 				if f, ok := flow.loops[task.Type()]; ok {
 					for _, v := range f {
-						t := NewTask(v, payload)
-						_, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t)
+						t := NewTask(v, payload, FlowID(task.FlowID))
+						_, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t, FlowID(task.FlowID), Retention(24*time.Hour))
 						if err != nil {
 							result.Error = err
 							return result
@@ -96,8 +97,8 @@ func (flow *Flow) edgeMiddleware(h Handler) Handler {
 		if h.GetType() == "condition" {
 			if f, ok := flow.branches[task.Type()]; ok && result.Status != "" {
 				if c, o := f[result.Status]; o {
-					t := NewTask(c, result.Data)
-					_, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t)
+					t := NewTask(c, result.Data, FlowID(task.FlowID))
+					_, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t, FlowID(task.FlowID), Retention(24*time.Hour))
 					if err != nil {
 						result.Error = err
 						return result
@@ -107,8 +108,8 @@ func (flow *Flow) edgeMiddleware(h Handler) Handler {
 		}
 		if f, ok := flow.edges[task.Type()]; ok {
 			for _, v := range f {
-				t := NewTask(v, result.Data)
-				_, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t)
+				t := NewTask(v, result.Data, FlowID(task.FlowID))
+				_, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t, FlowID(task.FlowID), Retention(24*time.Hour))
 				if err != nil {
 					result.Error = err
 					return result
@@ -196,8 +197,8 @@ func (flow *Flow) Shutdown() {
 }
 
 func SendToFlow(redisAddress string, flow *Flow, data []byte) (*TaskInfo, error) {
-	task := NewTask(flow.FirstNode, data)
+	task := NewTask(flow.FirstNode, data, FlowID(flow.ID))
 	client := NewClient(RedisClientOpt{Addr: redisAddress})
 	defer client.Close()
-	return client.Enqueue(task, Queue(flow.FirstNode), FlowID(flow.ID))
+	return client.Enqueue(task, Queue(flow.FirstNode), FlowID(flow.ID), Retention(24*time.Hour))
 }
