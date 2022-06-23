@@ -15,37 +15,56 @@ type Branch struct {
 }
 
 type Flow struct {
-	ID          string `json:"id"`
-	NodeHandler map[string]Handler
-	Nodes       []string   `json:"nodes,omitempty"`
-	Edges       [][]string `json:"edges,omitempty"`
-	Loops       [][]string `json:"loops,omitempty"`
-	Branches    []Branch   `json:"branches,omitempty"`
-	FirstNode   string     `json:"first_node"`
-	LastNode    string     `json:"last_node"`
-	server      *Server
-	edges       map[string][]string
-	loops       map[string][]string
-	branches    map[string]map[string]string
-	mu          sync.Mutex
-	handler     *ServeMux
+	ID                 string `json:"id"`
+	NodeHandler        map[string]Handler
+	Nodes              []string   `json:"nodes,omitempty"`
+	Edges              [][]string `json:"edges,omitempty"`
+	Loops              [][]string `json:"loops,omitempty"`
+	Branches           []Branch   `json:"branches,omitempty"`
+	FirstNode          string     `json:"first_node"`
+	LastNode           string     `json:"last_node"`
+	EnableTaskGrouping bool       `json:"enable_task_grouping"`
+	server             *Server
+	edges              map[string][]string
+	loops              map[string][]string
+	branches           map[string]map[string]string
+	mu                 sync.Mutex
+	handler            *ServeMux
 }
 
-func NewFlow(redisServer string, concurrency int) *Flow {
-	srv := NewServer(
-		RedisClientOpt{Addr: redisServer},
-		Config{
-			Concurrency: concurrency,
-		},
-	)
+func NewFlow(redisServer string, cfg Config, enableTaskGrouping bool) *Flow {
+	if cfg.Concurrency == 0 {
+		cfg.Concurrency = 1
+	}
+	if enableTaskGrouping {
+		if cfg.GroupAggregator == nil {
+			cfg.GroupAggregator = GroupAggregatorFunc(func(group string, tasks []*Task) *Task {
+				for _, t := range tasks {
+					return NewTask(t.Type(), t.Payload(), t.Options()...)
+				}
+				return nil
+			})
+		}
+		if cfg.GroupGracePeriod == 0 {
+			cfg.GroupGracePeriod = 3 * time.Second
+		}
+		if cfg.GroupMaxDelay == 0 {
+			cfg.GroupMaxDelay = 10 * time.Second
+		}
+		if cfg.GroupMaxSize == 0 {
+			cfg.GroupMaxSize = 1
+		}
+	}
+	srv := NewServer(RedisClientOpt{Addr: redisServer}, cfg)
 	return &Flow{
-		ID:          uuid.New().String(),
-		NodeHandler: make(map[string]Handler),
-		server:      srv,
-		mu:          sync.Mutex{},
-		edges:       make(map[string][]string),
-		loops:       make(map[string][]string),
-		branches:    make(map[string]map[string]string),
+		ID:                 uuid.New().String(),
+		NodeHandler:        make(map[string]Handler),
+		EnableTaskGrouping: enableTaskGrouping,
+		server:             srv,
+		mu:                 sync.Mutex{},
+		edges:              make(map[string][]string),
+		loops:              make(map[string][]string),
+		branches:           make(map[string]map[string]string),
 	}
 }
 
@@ -211,5 +230,10 @@ func SendToFlow(redisAddress string, flow *Flow, data []byte) (*TaskInfo, error)
 	task := NewTask(flow.FirstNode, data, FlowID(flow.ID))
 	client := NewClient(RedisClientOpt{Addr: redisAddress})
 	defer client.Close()
-	return client.Enqueue(task, Queue(flow.FirstNode), FlowID(flow.ID), Retention(24*time.Hour))
+	var ops []Option
+	ops = append(ops, Queue(flow.FirstNode), FlowID(flow.ID), Retention(24*time.Hour))
+	if flow.EnableTaskGrouping {
+		ops = append(ops, Group(flow.ID))
+	}
+	return client.Enqueue(task, ops...)
 }
