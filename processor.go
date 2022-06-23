@@ -25,51 +25,30 @@ import (
 )
 
 type processor struct {
-	logger *log.Logger
-	broker base.Broker
-	clock  timeutil.Clock
-
-	handler   Handler
-	baseCtxFn func() context.Context
-
-	queueConfig map[string]int
-
-	// orderedQueues is set only in strict-priority mode.
-	orderedQueues []string
-
-	retryDelayFunc RetryDelayFunc
-	isFailureFunc  func(error) bool
-
+	logger           *log.Logger
+	broker           base.Broker
+	clock            timeutil.Clock
+	handler          Handler
+	baseCtxFn        func() context.Context
+	queueConfig      map[string]int
+	orderedQueues    []string
+	retryDelayFunc   RetryDelayFunc
+	isFailureFunc    func(error) bool
 	errHandler       ErrorHandler
+	completeHandler  CompleteHandler
+	doneHandler      DoneHandler
 	recoverPanicFunc RecoverPanicFunc
 	shutdownTimeout  time.Duration
-
-	// channel via which to send sync requests to syncer.
-	syncRequestCh chan<- *syncRequest
-
-	// rate limiter to prevent spamming logs with a bunch of errors.
-	errLogLimiter *rate.Limiter
-
-	// sema is a counting semaphore to ensure the number of active workers
-	// does not exceed the limit.
-	sema chan struct{}
-
-	// channel to communicate back to the long running "processor" goroutine.
-	// once is used to send value to the channel only once.
-	done chan struct{}
-	once sync.Once
-
-	// quit channel is closed when the shutdown of the "processor" goroutine starts.
-	quit chan struct{}
-
-	// abort channel communicates to the in-flight worker goroutines to stop.
-	abort chan struct{}
-
-	// cancelations is a set of cancel functions for all active tasks.
-	cancelations *base.Cancelations
-
-	starting chan<- *workerInfo
-	finished chan<- *base.TaskMessage
+	syncRequestCh    chan<- *syncRequest
+	errLogLimiter    *rate.Limiter
+	sema             chan struct{}
+	done             chan struct{}
+	once             sync.Once
+	quit             chan struct{}
+	abort            chan struct{}
+	cancelations     *base.Cancelations
+	starting         chan<- *workerInfo
+	finished         chan<- *base.TaskMessage
 }
 
 type processorParams struct {
@@ -85,6 +64,8 @@ type processorParams struct {
 	queues           map[string]int
 	strictPriority   bool
 	errHandler       ErrorHandler
+	completeHandler  CompleteHandler
+	doneHandler      DoneHandler
 	shutdownTimeout  time.Duration
 	starting         chan<- *workerInfo
 	finished         chan<- *base.TaskMessage
@@ -120,6 +101,8 @@ func newProcessor(params processorParams) *processor {
 		quit:             make(chan struct{}),
 		abort:            make(chan struct{}),
 		errHandler:       params.errHandler,
+		completeHandler:  params.completeHandler,
+		doneHandler:      params.doneHandler,
 		handler: HandlerFunc(func(ctx context.Context, t *Task) Result {
 			return Result{
 				Data:  nil,
@@ -261,7 +244,7 @@ func (p *processor) exec() {
 					p.handleFailedMessage(ctx, lease, msg, resErr.Error)
 					return
 				}
-				p.handleSucceededMessage(lease, msg)
+				p.handleSucceededMessage(ctx, lease, msg)
 			}
 		}()
 	}
@@ -281,10 +264,16 @@ func (p *processor) requeue(l *base.Lease, msg *base.TaskMessage) {
 	}
 }
 
-func (p *processor) handleSucceededMessage(l *base.Lease, msg *base.TaskMessage) {
+func (p *processor) handleSucceededMessage(ctx context.Context, l *base.Lease, msg *base.TaskMessage) {
 	if msg.Retention > 0 {
+		if p.completeHandler != nil {
+			p.completeHandler.HandleComplete(ctx, NewTask(msg.Type, msg.Payload, FlowID(msg.FlowID)))
+		}
 		p.markAsComplete(l, msg)
 	} else {
+		if p.doneHandler != nil {
+			p.doneHandler.HandleDone(ctx, NewTask(msg.Type, msg.Payload, FlowID(msg.FlowID)))
+		}
 		p.markAsDone(l, msg)
 	}
 }
@@ -336,7 +325,7 @@ var SkipRetry = errors.New("skip retry for the task")
 
 func (p *processor) handleFailedMessage(ctx context.Context, l *base.Lease, msg *base.TaskMessage, err error) {
 	if p.errHandler != nil {
-		p.errHandler.HandleError(ctx, NewTask(msg.Type, msg.Payload), err)
+		p.errHandler.HandleError(ctx, NewTask(msg.Type, msg.Payload, FlowID(msg.FlowID)), err)
 	}
 	if !p.isFailureFunc(err) {
 		// retry the task without marking it as failed

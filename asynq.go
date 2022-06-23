@@ -49,10 +49,19 @@ func (t *Task) Options() []Option { return t.opts }
 // NewTask returns a new Task given a type name and payload data.
 // Options can be passed to configure task processing behavior.
 func NewTask(typename string, payload []byte, opts ...Option) *Task {
+	var f string
+	for _, opt := range opts {
+		switch flowID := opt.(type) {
+		case flowIDOption:
+			f = flowID.String()
+			break
+		}
+	}
 	return &Task{
 		typename: typename,
 		payload:  payload,
 		opts:     opts,
+		FlowID:   f,
 	}
 }
 

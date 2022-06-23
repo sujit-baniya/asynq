@@ -180,6 +180,10 @@ type Config struct {
 	//     ErrorHandler: asynq.ErrorHandlerFunc(reportError)
 	ErrorHandler ErrorHandler
 
+	CompleteHandler CompleteHandler
+
+	DoneHandler DoneHandler
+
 	// Logger specifies the logger used by the server instance.
 	//
 	// If unset, default logger is used.
@@ -272,6 +276,34 @@ type ErrorHandlerFunc func(ctx context.Context, task *Task, err error)
 // HandleError calls fn(ctx, task, err)
 func (fn ErrorHandlerFunc) HandleError(ctx context.Context, task *Task, err error) {
 	fn(ctx, task, err)
+}
+
+// An CompleteHandler handles an error occurred during task processing.
+type CompleteHandler interface {
+	HandleComplete(ctx context.Context, task *Task)
+}
+
+// The CompleteHandlerFunc type is an adapter to allow the use of  ordinary functions as a CompleteHandler.
+// If f is a function with the appropriate signature, CompleteHandlerFunc(f) is a CompleteHandler that calls f.
+type CompleteHandlerFunc func(ctx context.Context, task *Task)
+
+// HandleComplete calls fn(ctx, task, err)
+func (fn CompleteHandlerFunc) HandleComplete(ctx context.Context, task *Task) {
+	fn(ctx, task)
+}
+
+// An DoneHandler handles an error occurred during task processing.
+type DoneHandler interface {
+	HandleDone(ctx context.Context, task *Task)
+}
+
+// The DoneHandlerFunc type is an adapter to allow the use of  ordinary functions as a DoneHandler.
+// If f is a function with the appropriate signature, DoneHandlerFunc(f) is a DoneHandler that calls f.
+type DoneHandlerFunc func(ctx context.Context, task *Task)
+
+// HandleDone calls fn(ctx, task, err)
+func (fn DoneHandlerFunc) HandleDone(ctx context.Context, task *Task) {
+	fn(ctx, task)
 }
 
 // RecoverPanicFunc is used to inject some actions which will be performed when workers catch panic.
@@ -530,6 +562,8 @@ func NewServer(r RedisConnOpt, cfg Config) *Server {
 		queues:           queues,
 		strictPriority:   cfg.StrictPriority,
 		errHandler:       cfg.ErrorHandler,
+		completeHandler:  cfg.CompleteHandler,
+		doneHandler:      cfg.DoneHandler,
 		shutdownTimeout:  shutdownTimeout,
 		starting:         starting,
 		finished:         finished,

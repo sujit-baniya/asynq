@@ -2,14 +2,28 @@ package main
 
 import (
 	"asynq"
+	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 )
 
 const redisAddrWorker = "127.0.0.1:6379"
 
+// The CompleteHandlerFunc type is an adapter to allow the use of  ordinary functions as a CompleteHandler.
+// If f is a function with the appropriate signature, CompleteHandlerFunc(f) is a CompleteHandler that calls f.
+type CompleteHandlerFunc struct{}
+
+// HandleComplete calls fn(ctx, task, err)
+func (fn CompleteHandlerFunc) HandleComplete(ctx context.Context, task *asynq.Task) {
+	fmt.Println("Complete...", string(task.Payload()), "task", task.FlowID)
+}
+
 func main() {
-	flow := asynq.NewFlow(redisAddrWorker, asynq.Config{Concurrency: 1}, false)
+	cfg := asynq.Config{
+		CompleteHandler: &CompleteHandlerFunc{},
+	}
+	flow := asynq.NewFlow(redisAddrWorker, cfg, false)
 	flow.AddHandler("email:deliver", &EmailDelivery{Operation{Type: "process"}})
 	flow.AddHandler("prepare:email", &PrepareEmail{Operation{Type: "process"}})
 	flow.AddHandler("get:input", &GetData{Operation{Type: "input"}})

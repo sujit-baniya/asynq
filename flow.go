@@ -237,3 +237,12 @@ func SendToFlow(redisAddress string, flow *Flow, data []byte) (*TaskInfo, error)
 	}
 	return client.Enqueue(task, ops...)
 }
+
+func MergeMap(map1 map[string]interface{}, map2 map[string]interface{}) map[string]interface{} {
+	for k, m := range map2 {
+		if _, ok := map1[k]; !ok {
+			map1[k] = m
+		}
+	}
+	return map1
+}
