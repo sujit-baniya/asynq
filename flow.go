@@ -1,6 +1,7 @@
 package asynq
 
 import (
+	"asynq/internal/base"
 	"context"
 	"encoding/json"
 	"github.com/google/uuid"
@@ -22,7 +23,7 @@ type Flow struct {
 	Branches    []Branch   `json:"branches,omitempty"`
 	FirstNode   string     `json:"first_node"`
 	LastNode    string     `json:"last_node"`
-	Server      *Server
+	server      *Server
 	edges       map[string][]string
 	loops       map[string][]string
 	branches    map[string]map[string]string
@@ -40,11 +41,19 @@ func NewFlow(redisServer string, concurrency int) *Flow {
 	return &Flow{
 		ID:          uuid.New().String(),
 		NodeHandler: make(map[string]Handler),
-		Server:      srv,
+		server:      srv,
 		mu:          sync.Mutex{},
 		edges:       make(map[string][]string),
 		loops:       make(map[string][]string),
 		branches:    make(map[string]map[string]string),
+	}
+}
+
+func (flow *Flow) Enqueue(ctx context.Context, queueName string, broker base.Broker, flowID string, payload []byte, result *Result) {
+	task := NewTask(queueName, payload, FlowID(flowID))
+	_, err := EnqueueContext(broker, ctx, task, FlowID(flowID), Retention(24*time.Hour))
+	if err != nil {
+		result.Error = err
 	}
 }
 
@@ -84,10 +93,8 @@ func (flow *Flow) edgeMiddleware(h Handler) Handler {
 				}
 				if f, ok := flow.loops[task.Type()]; ok {
 					for _, v := range f {
-						t := NewTask(v, payload, FlowID(task.FlowID))
-						_, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t, FlowID(task.FlowID), Retention(24*time.Hour))
-						if err != nil {
-							result.Error = err
+						flow.Enqueue(ctx, v, task.ResultWriter().Broker(), task.FlowID, payload, &result)
+						if result.Error != nil {
 							return result
 						}
 					}
@@ -97,10 +104,9 @@ func (flow *Flow) edgeMiddleware(h Handler) Handler {
 		if h.GetType() == "condition" {
 			if f, ok := flow.branches[task.Type()]; ok && result.Status != "" {
 				if c, o := f[result.Status]; o {
-					t := NewTask(c, result.Data, FlowID(task.FlowID))
-					_, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t, FlowID(task.FlowID), Retention(24*time.Hour))
-					if err != nil {
-						result.Error = err
+					flow.Enqueue(ctx, c, task.ResultWriter().Broker(), task.FlowID, result.Data, &result)
+					if result.Error != nil {
+						panic(result.Error)
 						return result
 					}
 				}
@@ -108,10 +114,8 @@ func (flow *Flow) edgeMiddleware(h Handler) Handler {
 		}
 		if f, ok := flow.edges[task.Type()]; ok {
 			for _, v := range f {
-				t := NewTask(v, result.Data, FlowID(task.FlowID))
-				_, err := EnqueueContext(task.ResultWriter().Broker(), ctx, t, FlowID(task.FlowID), Retention(24*time.Hour))
-				if err != nil {
-					result.Error = err
+				flow.Enqueue(ctx, v, task.ResultWriter().Broker(), task.FlowID, result.Data, &result)
+				if result.Error != nil {
 					return result
 				}
 			}
@@ -145,16 +149,20 @@ func (flow *Flow) AddLoop(in, out string) {
 	flow.Loops = append(flow.Loops, loop)
 }
 
-func (flow *Flow) SetupServer() error {
+func (flow *Flow) Prepare() {
 	flow.PrepareEdge()
 	flow.PrepareLoop()
 	flow.PrepareBranch()
+}
+
+func (flow *Flow) SetupServer() error {
+	flow.Prepare()
 	mux := NewServeMux()
 	for node, handler := range flow.NodeHandler {
 		if handler.GetType() == "input" {
 			flow.FirstNode = node
 		}
-		flow.Server.AddQueue(node, 1)
+		flow.server.AddQueue(node, 1)
 		result := mux.Handle(node, handler)
 		if result.Error != nil {
 			return result.Error
@@ -162,7 +170,7 @@ func (flow *Flow) SetupServer() error {
 	}
 	mux.Use(flow.edgeMiddleware)
 	flow.handler = mux
-	flow.Server.AddHandler(mux)
+	flow.server.AddHandler(mux)
 	return nil
 }
 
@@ -189,11 +197,11 @@ func (flow *Flow) Use(handler func(h Handler) Handler) {
 }
 
 func (flow *Flow) Start() error {
-	return flow.Server.Run()
+	return flow.server.Run()
 }
 
 func (flow *Flow) Shutdown() {
-	flow.Server.Shutdown()
+	flow.server.Shutdown()
 }
 
 func SendToFlow(redisAddress string, flow *Flow, data []byte) (*TaskInfo, error) {
