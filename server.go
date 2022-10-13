@@ -6,8 +6,10 @@ package asynq
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/rs/xid"
 	"math"
 	"math/rand"
 	"runtime"
@@ -15,11 +17,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
-
-	"asynq/internal/base"
-	"asynq/internal/log"
-	"asynq/internal/rdb"
+	"github.com/sujit-baniya/asynq/internal/base"
+	"github.com/sujit-baniya/asynq/internal/log"
+	"github.com/sujit-baniya/asynq/internal/rdb"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -35,7 +35,7 @@ import (
 // If a task exhausts its retries, it will be moved to the archive and
 // will be kept in the archive set.
 // Note that the archive size is finite and once it reaches its max size,
-// oldest tasks in the archive will be deleted.
+// the oldest tasks in the archive will be deleted.
 type Server struct {
 	ServerID    string
 	queues      map[string]int
@@ -100,11 +100,18 @@ func (s serverStateValue) String() string {
 
 // Config specifies the server's background-task processing behavior.
 type Config struct {
+	RedisClientOpt RedisClientOpt `json:"redis_opt"`
+	RDB            *rdb.RDB
+	Mode           Mode   `json:"mode"`
+	NoService      bool   `json:"no_service"`
+	FlowID         string `json:"flow_id"`
+	FlowPrefix     string `json:"flow_prefix"`
+	UserID         any    `json:"user_id"`
 	// Maximum number of concurrent processing of tasks.
 	//
 	// If set to a zero or negative value, NewServer will overwrite the value
 	// to the number of CPUs usable by the current process.
-	Concurrency int
+	Concurrency int `json:"concurrency"`
 
 	// BaseContext optionally specifies a function that returns the base context for Handler invocations on this server.
 	//
@@ -140,7 +147,7 @@ type Config struct {
 	//         "low":      1,
 	//     }
 	//
-	// With the above config and given that all queues are not empty, the tasks
+	// With the above Config and given that all queues are not empty, the tasks
 	// in "critical", "default", "low" should be processed 60%, 30%, 10% of
 	// the time respectively.
 	//
@@ -183,6 +190,8 @@ type Config struct {
 	CompleteHandler CompleteHandler
 
 	DoneHandler DoneHandler
+
+	CronReportHandler Handler
 
 	// Logger specifies the logger used by the server instance.
 	//
@@ -242,6 +251,10 @@ type Config struct {
 	//
 	// If unset or nil, the group aggregation feature will be disabled on the server.
 	GroupAggregator GroupAggregator
+	idKey           string
+	statusKey       string
+	operationKey    string
+	flowIDKey       string
 }
 
 // GroupAggregator aggregates a group of tasks into one before the tasks are passed to the Handler.
@@ -442,13 +455,26 @@ const (
 	defaultGroupGracePeriod = 1 * time.Minute
 )
 
+func NewRDB(cfg Config) *rdb.RDB {
+	if cfg.RDB != nil {
+		return cfg.RDB
+	}
+	if cfg.RedisClientOpt.Addr == "" {
+		cfg.RedisClientOpt = RedisClientOpt{Addr: "127.0.0.1:6379"}
+	}
+
+	c, ok := cfg.RedisClientOpt.MakeRedisClient().(redis.UniversalClient)
+	if !ok {
+		panic(fmt.Sprintf("asynq: unsupported RedisConnOpt type %T", cfg.RedisClientOpt))
+	}
+	return rdb.NewRDB(c)
+}
+
 // NewServer returns a new Server given a redis connection option
 // and server configuration.
-func NewServer(r RedisConnOpt, cfg Config) *Server {
-	c, ok := r.MakeRedisClient().(redis.UniversalClient)
-	if !ok {
-		panic(fmt.Sprintf("asynq: unsupported RedisConnOpt type %T", r))
-	}
+func NewServer(cfg Config) *Server {
+	rd := NewRDB(cfg)
+
 	baseCtxFn := cfg.BaseContext
 	if baseCtxFn == nil {
 		baseCtxFn = context.Background
@@ -503,8 +529,6 @@ func NewServer(r RedisConnOpt, cfg Config) *Server {
 		loglevel = InfoLevel
 	}
 	logger.SetLevel(toInternalLogLevel(loglevel))
-
-	rd := rdb.NewRDB(c)
 	starting := make(chan *workerInfo)
 	finished := make(chan *base.TaskMessage)
 	syncCh := make(chan *syncRequest)
@@ -514,7 +538,7 @@ func NewServer(r RedisConnOpt, cfg Config) *Server {
 	if cfg.ServerID != "" {
 		serverID = cfg.ServerID
 	} else {
-		serverID = uuid.New().String()
+		serverID = xid.New().String()
 	}
 
 	syncer := newSyncer(syncerParams{
@@ -639,6 +663,14 @@ type Result struct {
 	Status string `json:"status"`
 	Data   []byte `json:"data"`
 	Error  error  `json:"error"`
+}
+
+func (r Result) Unmarshal(data any) error {
+	return json.Unmarshal(r.Data, data)
+}
+
+func (r Result) String() string {
+	return string(r.Data)
 }
 
 // The HandlerFunc type is an adapter to allow the use of

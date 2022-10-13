@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"asynq/internal/base"
-	"asynq/internal/log"
 	"github.com/go-redis/redis/v8"
+	"github.com/sujit-baniya/asynq/internal/base"
+	"github.com/sujit-baniya/asynq/internal/log"
 )
 
 type subscriber struct {

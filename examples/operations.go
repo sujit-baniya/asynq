@@ -1,10 +1,10 @@
 package main
 
 import (
-	"asynq"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/sujit-baniya/asynq"
 )
 
 type Operation struct {
@@ -54,8 +54,10 @@ type PrepareEmail struct {
 func (e *PrepareEmail) ProcessTask(ctx context.Context, task *asynq.Task) asynq.Result {
 	var data map[string]any
 	json.Unmarshal(task.Payload(), &data)
-	fmt.Println("Preparing...", data)
-	return asynq.Result{Data: task.Payload()}
+	data["email_valid"] = true
+	d, _ := json.Marshal(data)
+	fmt.Println("Preparing...", string(d))
+	return asynq.Result{Data: d}
 }
 
 type EmailDelivery struct {
