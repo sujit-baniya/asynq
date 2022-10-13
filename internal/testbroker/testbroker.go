@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"asynq/internal/base"
 	"github.com/go-redis/redis/v8"
+	"github.com/sujit-baniya/asynq/internal/base"
 )
 
 var errRedisDown = errors.New("testutil: redis is down")
@@ -237,6 +237,14 @@ func (tb *TestBroker) Close() error {
 		return errRedisDown
 	}
 	return tb.real.Close()
+}
+
+func (tb *TestBroker) AddTask(key string, data []byte) error {
+	return nil
+}
+
+func (tb *TestBroker) GetTask(key string) ([]byte, error) {
+	return nil, nil
 }
 
 func (tb *TestBroker) AddToGroup(ctx context.Context, msg *base.TaskMessage, gname string) error {

@@ -6,11 +6,10 @@ package asynq
 
 import (
 	"context"
+	"github.com/sujit-baniya/asynq/internal/base"
+	"github.com/sujit-baniya/asynq/internal/log"
 	"sync"
 	"time"
-
-	"asynq/internal/base"
-	"asynq/internal/log"
 )
 
 // An aggregator is responsible for checking groups and aggregate into one task

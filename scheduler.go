@@ -6,16 +6,16 @@ package asynq
 
 import (
 	"fmt"
+	"github.com/rs/xid"
 	"os"
 	"sync"
 	"time"
 
-	"asynq/internal/base"
-	"asynq/internal/log"
-	"asynq/internal/rdb"
 	"github.com/go-redis/redis/v8"
-	"github.com/google/uuid"
 	"github.com/robfig/cron/v3"
+	"github.com/sujit-baniya/asynq/internal/base"
+	"github.com/sujit-baniya/asynq/internal/log"
+	"github.com/sujit-baniya/asynq/internal/rdb"
 )
 
 // A Scheduler kicks off tasks at regular intervals based on the user defined schedule.
@@ -84,12 +84,47 @@ func NewScheduler(r RedisConnOpt, opts *SchedulerOpts) *Scheduler {
 	}
 }
 
+// NewSchedulerFromRDB returns a new Scheduler instance given the redis connection option.
+// The parameter opts is optional, defaults will be used if opts is set to nil
+func NewSchedulerFromRDB(rd *rdb.RDB, opts *SchedulerOpts) *Scheduler {
+	if opts == nil {
+		opts = &SchedulerOpts{}
+	}
+
+	logger := log.NewLogger(opts.Logger)
+	loglevel := opts.LogLevel
+	if loglevel == level_unspecified {
+		loglevel = InfoLevel
+	}
+	logger.SetLevel(toInternalLogLevel(loglevel))
+
+	loc := opts.Location
+	if loc == nil {
+		loc = time.UTC
+	}
+
+	return &Scheduler{
+		id:              generateSchedulerID(),
+		state:           &serverState{value: srvStateNew},
+		logger:          logger,
+		client:          NewClientFromRDB(rd),
+		rdb:             rd,
+		cron:            cron.New(cron.WithLocation(loc)),
+		location:        loc,
+		done:            make(chan struct{}),
+		preEnqueueFunc:  opts.PreEnqueueFunc,
+		postEnqueueFunc: opts.PostEnqueueFunc,
+		errHandler:      opts.EnqueueErrorHandler,
+		idmap:           make(map[string]cron.EntryID),
+	}
+}
+
 func generateSchedulerID() string {
 	host, err := os.Hostname()
 	if err != nil {
 		host = "unknown-host"
 	}
-	return fmt.Sprintf("%s:%d:%v", host, os.Getpid(), uuid.New())
+	return fmt.Sprintf("%s:%d:%s", host, os.Getpid(), xid.New().String())
 }
 
 // SchedulerOpts specifies scheduler options.
@@ -125,7 +160,7 @@ type SchedulerOpts struct {
 
 // enqueueJob encapsulates the job of enqueuing a task and recording the event.
 type enqueueJob struct {
-	id              uuid.UUID
+	id              string
 	cronspec        string
 	task            *Task
 	opts            []Option
@@ -157,7 +192,7 @@ func (j *enqueueJob) Run() {
 		TaskID:     info.ID,
 		EnqueuedAt: time.Now().In(j.location),
 	}
-	err = j.rdb.RecordSchedulerEnqueueEvent(j.id.String(), event)
+	err = j.rdb.RecordSchedulerEnqueueEvent(j.id, event)
 	if err != nil {
 		j.logger.Warnf("scheduler could not record enqueue event of enqueued task %s: %v", info.ID, err)
 	}
@@ -167,7 +202,7 @@ func (j *enqueueJob) Run() {
 // It returns an ID of the newly registered entry.
 func (s *Scheduler) Register(cronspec string, task *Task, opts ...Option) (entryID string, err error) {
 	job := &enqueueJob{
-		id:              uuid.New(),
+		id:              xid.New().String(),
 		cronspec:        cronspec,
 		task:            task,
 		opts:            opts,
@@ -184,9 +219,9 @@ func (s *Scheduler) Register(cronspec string, task *Task, opts ...Option) (entry
 		return "", err
 	}
 	s.mu.Lock()
-	s.idmap[job.id.String()] = cronID
+	s.idmap[job.id] = cronID
 	s.mu.Unlock()
-	return job.id.String(), nil
+	return job.id, nil
 }
 
 // Unregister removes a registered entry by entry ID.
@@ -288,7 +323,7 @@ func (s *Scheduler) beat() {
 	for _, entry := range s.cron.Entries() {
 		job := entry.Job.(*enqueueJob)
 		e := &base.SchedulerEntry{
-			ID:      job.id.String(),
+			ID:      job.id,
 			Spec:    job.cronspec,
 			Type:    job.task.Type(),
 			Payload: job.task.Payload(),
@@ -315,8 +350,8 @@ func stringifyOptions(opts []Option) []string {
 func (s *Scheduler) clearHistory() {
 	for _, entry := range s.cron.Entries() {
 		job := entry.Job.(*enqueueJob)
-		if err := s.rdb.ClearSchedulerHistory(job.id.String()); err != nil {
-			s.logger.Warnf("Could not clear scheduler history for entry %q: %v", job.id.String(), err)
+		if err := s.rdb.ClearSchedulerHistory(job.id); err != nil {
+			s.logger.Warnf("Could not clear scheduler history for entry %q: %v", job.id, err)
 		}
 	}
 }

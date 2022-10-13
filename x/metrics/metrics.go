@@ -3,10 +3,10 @@ package metrics
 
 import (
 	"fmt"
+	"github.com/sujit-baniya/asynq"
 	"log"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"asynq"
 )
 
 // Namespace used in fully-qualified metrics names.

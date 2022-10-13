@@ -7,7 +7,7 @@ package asynq
 import (
 	"context"
 
-	asynqcontext "asynq/internal/context"
+	asynqcontext "github.com/sujit-baniya/asynq/internal/context"
 )
 
 // GetTaskID extracts a task ID from a context, if any.

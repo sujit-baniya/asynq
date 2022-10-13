@@ -5,15 +5,15 @@
 package testutil
 
 import (
+	"github.com/rs/xid"
 	"time"
 
-	"github.com/google/uuid"
-	"asynq/internal/base"
+	"github.com/sujit-baniya/asynq/internal/base"
 )
 
 func makeDefaultTaskMessage() *base.TaskMessage {
 	return &base.TaskMessage{
-		ID:       uuid.NewString(),
+		ID:       xid.New().String(),
 		Type:     "default_task",
 		Queue:    "default",
 		Retry:    25,

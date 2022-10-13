@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"asynq/internal/base"
-	"asynq/internal/errors"
 	"github.com/go-redis/redis/v8"
 	"github.com/spf13/cast"
+	"github.com/sujit-baniya/asynq/internal/base"
+	"github.com/sujit-baniya/asynq/internal/errors"
 )
 
 // AllQueues returns a list of all queue names.
@@ -1788,6 +1788,8 @@ redis.call("DEL", KEYS[3])
 redis.call("DEL", KEYS[4])
 redis.call("DEL", KEYS[5])
 redis.call("DEL", KEYS[6])
+redis.call("DEL", KEYS[7])
+redis.call("DEL", KEYS[8])
 return 1`)
 
 // RemoveQueue removes the specified queue.
@@ -1818,6 +1820,8 @@ func (r *RDB) RemoveQueue(qname string, force bool) error {
 		base.RetryKey(qname),
 		base.ArchivedKey(qname),
 		base.LeaseKey(qname),
+		base.ProcessedTotalKey(qname),
+		base.FailedTotalKey(qname),
 	}
 	res, err := script.Run(context.Background(), r.client, keys, base.TaskKeyPrefix(qname)).Result()
 	if err != nil {

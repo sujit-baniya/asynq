@@ -9,18 +9,15 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"runtime"
-	"runtime/debug"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
-	"asynq/internal/base"
-	asynqcontext "asynq/internal/context"
-	"asynq/internal/errors"
-	"asynq/internal/log"
-	"asynq/internal/timeutil"
+	"github.com/sujit-baniya/asynq/internal/base"
+	asynqcontext "github.com/sujit-baniya/asynq/internal/context"
+	"github.com/sujit-baniya/asynq/internal/errors"
+	"github.com/sujit-baniya/asynq/internal/log"
+	"github.com/sujit-baniya/asynq/internal/timeutil"
 	"golang.org/x/time/rate"
 )
 
@@ -241,10 +238,10 @@ func (p *processor) exec() {
 				return
 			case resErr := <-resCh:
 				if resErr.Error != nil {
-					p.handleFailedMessage(ctx, lease, msg, resErr.Error)
+					p.handleFailedMessage(ctx, lease, msg, resErr.Error, resErr.Data)
 					return
 				}
-				p.handleSucceededMessage(ctx, lease, msg)
+				p.handleSucceededMessage(ctx, lease, msg, resErr.Data)
 			}
 		}()
 	}
@@ -264,15 +261,21 @@ func (p *processor) requeue(l *base.Lease, msg *base.TaskMessage) {
 	}
 }
 
-func (p *processor) handleSucceededMessage(ctx context.Context, l *base.Lease, msg *base.TaskMessage) {
+func (p *processor) handleSucceededMessage(ctx context.Context, l *base.Lease, msg *base.TaskMessage, result ...[]byte) {
+	var data []byte
+	if len(result) > 0 {
+		data = result[0]
+	} else {
+		data = msg.Payload
+	}
 	if msg.Retention > 0 {
 		if p.completeHandler != nil {
-			p.completeHandler.HandleComplete(ctx, NewTask(msg.Type, msg.Payload, FlowID(msg.FlowID), TaskID(msg.ID)))
+			p.completeHandler.HandleComplete(ctx, NewTask(msg.Type, data, FlowID(msg.FlowID), TaskID(msg.ID)))
 		}
 		p.markAsComplete(l, msg)
 	} else {
 		if p.doneHandler != nil {
-			p.doneHandler.HandleDone(ctx, NewTask(msg.Type, msg.Payload, FlowID(msg.FlowID), TaskID(msg.ID)))
+			p.doneHandler.HandleDone(ctx, NewTask(msg.Type, data, FlowID(msg.FlowID), TaskID(msg.ID)))
 		}
 		p.markAsDone(l, msg)
 	}
@@ -323,9 +326,15 @@ func (p *processor) markAsDone(l *base.Lease, msg *base.TaskMessage) {
 // the task should not be retried and should be archived instead.
 var SkipRetry = errors.New("skip retry for the task")
 
-func (p *processor) handleFailedMessage(ctx context.Context, l *base.Lease, msg *base.TaskMessage, err error) {
+func (p *processor) handleFailedMessage(ctx context.Context, l *base.Lease, msg *base.TaskMessage, err error, result ...[]byte) {
+	var data []byte
+	if len(result) > 0 {
+		data = result[0]
+	} else {
+		data = msg.Payload
+	}
 	if p.errHandler != nil {
-		p.errHandler.HandleError(ctx, NewTask(msg.Type, msg.Payload, FlowID(msg.FlowID), TaskID(msg.ID)), err)
+		p.errHandler.HandleError(ctx, NewTask(msg.Type, data, FlowID(msg.FlowID), TaskID(msg.ID)), err)
 	}
 	if !p.isFailureFunc(err) {
 		// retry the task without marking it as failed
@@ -413,7 +422,7 @@ func (p *processor) queues() []string {
 // If the call returns without panic, it simply returns the value,
 // otherwise, it recovers from panic and returns an error.
 func (p *processor) perform(ctx context.Context, task *Task) (result Result) {
-	defer func() {
+	/*defer func() {
 		if x := recover(); x != nil {
 			errMsg := string(debug.Stack())
 			if p.recoverPanicFunc != nil {
@@ -434,7 +443,7 @@ func (p *processor) perform(ctx context.Context, task *Task) (result Result) {
 				result.Error = fmt.Errorf("panic: %v", x)
 			}
 		}
-	}()
+	}()*/
 	return p.handler.ProcessTask(ctx, task)
 }
 

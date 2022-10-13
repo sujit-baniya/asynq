@@ -7,6 +7,7 @@ package asynq
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/url"
@@ -14,9 +15,16 @@ import (
 	"strings"
 	"time"
 
-	"asynq/internal/base"
 	"github.com/go-redis/redis/v8"
+	"github.com/sujit-baniya/asynq/internal/base"
 )
+
+type Attachment struct {
+	AttachmentID string `json:"attachment_id"`
+	Data         []byte `json:"data"`
+	File         string `json:"file"`
+	MimeType     string `json:"mime_type"`
+}
 
 // Task represents a unit of work to be performed.
 type Task struct {
@@ -32,7 +40,16 @@ type Task struct {
 	opts []Option
 
 	// w is the ResultWriter for the task.
-	w *ResultWriter
+	w           *ResultWriter
+	Attachments []Attachment `json:"attachments"`
+}
+
+func (t *Task) UnmarshalBinary(data []byte) error {
+	return json.Unmarshal(data, t)
+}
+
+func (t *Task) MarshalBinary() ([]byte, error) {
+	return json.Marshal(t)
 }
 
 func (t *Task) Type() string    { return t.typename }
@@ -460,10 +477,11 @@ func (opt RedisClusterClientOpt) MakeRedisClient() any {
 //
 // Three URI schemes are supported, which are redis:, rediss:, redis-socket:, and redis-sentinel:.
 // Supported formats are:
-//     redis://[:password@]host[:port][/dbnumber]
-//     rediss://[:password@]host[:port][/dbnumber]
-//     redis-socket://[:password@]path[?db=dbnumber]
-//     redis-sentinel://[:password@]host1[:port][,host2:[:port]][,hostN:[:port]][?master=masterName]
+//
+//	redis://[:password@]host[:port][/dbnumber]
+//	rediss://[:password@]host[:port][/dbnumber]
+//	redis-socket://[:password@]path[?db=dbnumber]
+//	redis-sentinel://[:password@]host1[:port][,host2:[:port]][,hostN:[:port]][?master=masterName]
 func ParseRedisURI(uri string) (RedisConnOpt, error) {
 	u, err := url.Parse(uri)
 	if err != nil {

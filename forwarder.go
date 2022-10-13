@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"asynq/internal/base"
-	"asynq/internal/log"
+	"github.com/sujit-baniya/asynq/internal/base"
+	"github.com/sujit-baniya/asynq/internal/log"
 )
 
 // A forwarder is responsible for moving scheduled and retry tasks to pending state

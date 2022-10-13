@@ -8,17 +8,17 @@ package testutil
 import (
 	"context"
 	"encoding/json"
+	"github.com/rs/xid"
 	"math"
 	"sort"
 	"testing"
 	"time"
 
-	"asynq/internal/base"
-	"asynq/internal/timeutil"
 	"github.com/go-redis/redis/v8"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/google/uuid"
+	"github.com/sujit-baniya/asynq/internal/base"
+	"github.com/sujit-baniya/asynq/internal/timeutil"
 )
 
 // EquateInt64Approx returns a Comparer option that treats int64 values
@@ -119,7 +119,7 @@ func NewTaskMessage(taskType string, payload []byte) *base.TaskMessage {
 // task type, payload and queue name.
 func NewTaskMessageWithQueue(taskType string, payload []byte, qname string) *base.TaskMessage {
 	return &base.TaskMessage{
-		ID:       uuid.NewString(),
+		ID:       xid.New().String(),
 		Type:     taskType,
 		Queue:    qname,
 		Retry:    25,

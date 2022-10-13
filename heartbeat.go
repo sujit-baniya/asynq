@@ -5,14 +5,14 @@
 package asynq
 
 import (
+	"github.com/rs/xid"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
-	"asynq/internal/base"
-	"asynq/internal/log"
-	"asynq/internal/timeutil"
+	"github.com/sujit-baniya/asynq/internal/base"
+	"github.com/sujit-baniya/asynq/internal/log"
+	"github.com/sujit-baniya/asynq/internal/timeutil"
 )
 
 // heartbeater is responsible for writing process info to redis periodically to
@@ -69,7 +69,7 @@ func newHeartbeater(params heartbeaterParams) *heartbeater {
 		host = "unknown-host"
 	}
 	if params.serverID == "" {
-		params.serverID = uuid.New().String()
+		params.serverID = xid.New().String()
 	}
 	return &heartbeater{
 		logger:   params.logger,

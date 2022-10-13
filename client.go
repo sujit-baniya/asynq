@@ -7,14 +7,14 @@ package asynq
 import (
 	"context"
 	"fmt"
+	"github.com/rs/xid"
 	"strings"
 	"time"
 
-	"asynq/internal/base"
-	"asynq/internal/errors"
-	"asynq/internal/rdb"
 	"github.com/go-redis/redis/v8"
-	"github.com/google/uuid"
+	"github.com/sujit-baniya/asynq/internal/base"
+	"github.com/sujit-baniya/asynq/internal/errors"
+	"github.com/sujit-baniya/asynq/internal/rdb"
 )
 
 // A Client is responsible for scheduling tasks.
@@ -34,6 +34,15 @@ func NewClient(r RedisConnOpt) *Client {
 		panic(fmt.Sprintf("asynq: unsupported RedisConnOpt type %T", r))
 	}
 	return &Client{broker: rdb.NewRDB(c)}
+}
+
+// NewClientFromRDB returns a new Client instance given a redis connection option.
+func NewClientFromRDB(rd *rdb.RDB) *Client {
+	return &Client{broker: rd}
+}
+
+func (c *Client) Broker() base.Broker {
+	return c.broker
 }
 
 type OptionType int
@@ -160,9 +169,9 @@ func (t deadlineOption) Value() any       { return time.Time(t) }
 // TTL duration must be greater than or equal to 1 second.
 //
 // Uniqueness of a task is based on the following properties:
-//     - Task Type
-//     - Task Payload
-//     - Queue Name
+//   - Task Type
+//   - Task Payload
+//   - Queue Name
 func Unique(ttl time.Duration) Option {
 	return uniqueOption(ttl)
 }
@@ -248,7 +257,7 @@ func composeOptions(opts ...Option) (option, error) {
 		retry:     defaultMaxRetry,
 		queue:     base.DefaultQueueName,
 		flowID:    "",
-		taskID:    uuid.NewString(),
+		taskID:    xid.New().String(),
 		timeout:   0, // do not set to defaultTimeout here
 		deadline:  time.Time{},
 		processAt: time.Now(),

@@ -14,7 +14,7 @@ import (
 )
 
 // PeriodicTaskManager manages scheduling of periodic tasks.
-// It syncs scheduler's entries by calling the config provider periodically.
+// It syncs scheduler's entries by calling the Config provider periodically.
 type PeriodicTaskManager struct {
 	s            *Scheduler
 	p            PeriodicTaskConfigProvider
@@ -162,7 +162,7 @@ func (mgr *PeriodicTaskManager) initialSync() error {
 	}
 	for _, c := range configs {
 		if err := validatePeriodicTaskConfig(c); err != nil {
-			return fmt.Errorf("initial call to GetConfigs contained an invalid config: %v", err)
+			return fmt.Errorf("initial call to GetConfigs contained an invalid Config: %v", err)
 		}
 	}
 	mgr.add(configs)
@@ -202,7 +202,7 @@ func (mgr *PeriodicTaskManager) sync() {
 	}
 	for _, c := range configs {
 		if err := validatePeriodicTaskConfig(c); err != nil {
-			mgr.s.logger.Errorf("Failed to sync: GetConfigs returned an invalid config: %v", err)
+			mgr.s.logger.Errorf("Failed to sync: GetConfigs returned an invalid Config: %v", err)
 			return
 		}
 	}
@@ -213,8 +213,8 @@ func (mgr *PeriodicTaskManager) sync() {
 	mgr.add(added)
 }
 
-// diffRemoved diffs the incoming configs with the registered config and returns
-// a map containing hash and entryID of each config that was removed.
+// diffRemoved diffs the incoming configs with the registered Config and returns
+// a map containing hash and entryID of each Config that was removed.
 func (mgr *PeriodicTaskManager) diffRemoved(configs []*PeriodicTaskConfig) map[string]string {
 	newConfigs := make(map[string]string)
 	for _, c := range configs {
@@ -222,7 +222,7 @@ func (mgr *PeriodicTaskManager) diffRemoved(configs []*PeriodicTaskConfig) map[s
 	}
 	removed := make(map[string]string)
 	for k, v := range mgr.m {
-		// test whether existing config is present in the incoming configs
+		// test whether existing Config is present in the incoming configs
 		if _, found := newConfigs[k]; !found {
 			removed[k] = v
 		}

@@ -14,11 +14,11 @@ import (
 	"sync"
 	"time"
 
-	"asynq/internal/errors"
-	pb "asynq/internal/proto"
-	"asynq/internal/timeutil"
 	"github.com/go-redis/redis/v8"
 	"github.com/golang/protobuf/ptypes"
+	"github.com/sujit-baniya/asynq/internal/errors"
+	pb "github.com/sujit-baniya/asynq/internal/proto"
+	"github.com/sujit-baniya/asynq/internal/timeutil"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -721,6 +721,8 @@ type Broker interface {
 	Ping() error
 	Close() error
 	GetTaskInfo(queue, id string) (*TaskInfo, error)
+	AddTask(key string, data []byte) error
+	GetTask(key string) ([]byte, error)
 	Enqueue(ctx context.Context, msg *TaskMessage) error
 	EnqueueUnique(ctx context.Context, msg *TaskMessage, ttl time.Duration) error
 	Dequeue(qnames ...string) (*TaskMessage, time.Time, error)

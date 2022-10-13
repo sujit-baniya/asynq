@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"asynq/internal/base"
-	"asynq/internal/errors"
-	"asynq/internal/rdb"
 	"github.com/go-redis/redis/v8"
+	"github.com/sujit-baniya/asynq/internal/base"
+	"github.com/sujit-baniya/asynq/internal/errors"
+	"github.com/sujit-baniya/asynq/internal/rdb"
 )
 
 // Inspector is a client interface to inspect and mutate the state of
@@ -22,7 +22,7 @@ type Inspector struct {
 	rdb *rdb.RDB
 }
 
-// New returns a new instance of Inspector.
+// NewInspector returns a new instance of Inspector.
 func NewInspector(r RedisConnOpt) *Inspector {
 	c, ok := r.MakeRedisClient().(redis.UniversalClient)
 	if !ok {
@@ -30,6 +30,13 @@ func NewInspector(r RedisConnOpt) *Inspector {
 	}
 	return &Inspector{
 		rdb: rdb.NewRDB(c),
+	}
+}
+
+// NewInspectorFromRDB returns a new instance of Inspector.
+func NewInspectorFromRDB(rd *rdb.RDB) *Inspector {
+	return &Inspector{
+		rdb: rd,
 	}
 }
 
@@ -71,54 +78,54 @@ type GroupInfo struct {
 // QueueInfo represents a state of a queue at a certain time.
 type QueueInfo struct {
 	// Name of the queue.
-	Queue string
+	Queue string `json:"queue"`
 
 	// Total number of bytes that the queue and its tasks require to be stored in redis.
 	// It is an approximate memory usage value in bytes since the value is computed by sampling.
-	MemoryUsage int64
+	MemoryUsage int64 `json:"memory_usage"`
 
 	// Latency of the queue, measured by the oldest pending task in the queue.
-	Latency time.Duration
+	Latency time.Duration `json:"latency"`
 
 	// Size is the total number of tasks in the queue.
 	// The value is the sum of Pending, Active, Scheduled, Retry, Aggregating and Archived.
-	Size int
+	Size int `json:"size"`
 
 	// Groups is the total number of groups in the queue.
-	Groups int
+	Groups int `json:"groups"`
 
 	// Number of pending tasks.
-	Pending int
+	Pending int `json:"pending"`
 	// Number of active tasks.
-	Active int
+	Active int `json:"active"`
 	// Number of scheduled tasks.
-	Scheduled int
+	Scheduled int `json:"scheduled"`
 	// Number of retry tasks.
-	Retry int
+	Retry int `json:"retry"`
 	// Number of archived tasks.
-	Archived int
+	Archived int `json:"archived"`
 	// Number of stored completed tasks.
-	Completed int
+	Completed int `json:"completed"`
 	// Number of aggregating tasks.
-	Aggregating int
+	Aggregating int `json:"aggregating"`
 
 	// Total number of tasks being processed within the given date (counter resets daily).
 	// The number includes both succeeded and failed tasks.
-	Processed int
+	Processed int `json:"processed"`
 	// Total number of tasks failed to be processed within the given date (counter resets daily).
-	Failed int
+	Failed int `json:"failed"`
 
 	// Total number of tasks processed (cumulative).
-	ProcessedTotal int
+	ProcessedTotal int `json:"processed_total"`
 	// Total number of tasks failed (cumulative).
-	FailedTotal int
+	FailedTotal int `json:"failed_total"`
 
 	// Paused indicates whether the queue is paused.
 	// If true, tasks in the queue will not be processed.
-	Paused bool
+	Paused bool `json:"paused"`
 
 	// Time when this queue info snapshot was taken.
-	Timestamp time.Time
+	Timestamp time.Time `json:"timestamp"`
 }
 
 // GetQueueInfo returns current information of the given queue.
@@ -155,14 +162,14 @@ func (i *Inspector) GetQueueInfo(queue string) (*QueueInfo, error) {
 // DailyStats holds aggregate data for a given day for a given queue.
 type DailyStats struct {
 	// Name of the queue.
-	Queue string
+	Queue string `json:"queue"`
 	// Total number of tasks being processed during the given date.
 	// The number includes both succeeded and failed tasks.
-	Processed int
+	Processed int `json:"processed"`
 	// Total number of tasks failed to be processed during the given date.
-	Failed int
-	// Date this stats was taken.
-	Date time.Time
+	Failed int `json:"failed"`
+	// Date these stats was taken.
+	Date time.Time `json:"date"`
 }
 
 // History returns a list of stats from the last n days.
